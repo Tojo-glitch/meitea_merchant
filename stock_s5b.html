@@ -1,0 +1,4443 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ceramic — Stock Management</title>
+<script>
+(function(){
+  var t=localStorage.getItem('ctb_theme');
+  if(t) document.documentElement.setAttribute('data-theme',t);
+})();
+</script>
+<style>
+/* ── DESIGN TOKENS ───────────────────────────────── */
+:root {
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+
+  /* Dark theme */
+  --c0: #0f0e0c;
+  --c1: #161412;
+  --c2: #1e1b18;
+  --c3: #272320;
+  --c4: #312d29;
+
+  --tan:  #d4aa6a;
+  --tan2: #b8946a;
+  --tan3: #7a6a56;
+  --tan4: #4a3f34;
+
+  --gl:   #d4aa6a;
+  --gl2:  rgba(212,170,106,.08);
+  --line: rgba(212,170,106,.1);
+  --ln2:  rgba(212,170,106,.15);
+
+  --red:  #c0392b;
+  --red2: rgba(192,57,43,.08);
+  --grn:  #27ae60;
+  --grn2: rgba(39,174,96,.08);
+  --grn3: rgba(39,174,96,.15);
+  --grn4: #1e8449;
+  --blu:  #2980b9;
+  --blu2: rgba(41,128,185,.08);
+  --ora:  #e67e22;
+  --ora2: rgba(230,126,34,.08);
+
+  --radius: 10px;
+  --hdr: 52px;
+}
+[data-theme="light"] {
+  --c0: #f5f2ec; --c1: #ede9e1; --c2: #e5e0d5;
+  --c3: #dbd4c5; --c4: #cec6b3;
+  --tan: #8c6d3f; --tan2: #a07840; --tan3: #b8956a; --tan4: #d4b896;
+  --gl: #8c6d3f; --gl2: rgba(140,109,63,.06); --line: rgba(140,109,63,.12); --ln2: rgba(140,109,63,.18);
+}
+
+/* ── RESET ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--c0);
+  color: var(--tan);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+
+/* ── LAYOUT ──────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100dvh; max-width: 1280px; margin: 0 auto; position: relative; }
+
+/* ── HEADER ──────────────────────────────────────── */
+.hdr {
+  height: var(--hdr);
+  background: var(--c1);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.hdr-logo {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tan);
+  letter-spacing: .5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.hdr-logo span { color: var(--tan3); font-weight: 400; }
+.hdr-sep { width: 1px; height: 20px; background: var(--line); flex-shrink: 0; }
+.hdr-title { font-size: 13px; font-weight: 600; color: var(--tan2); }
+.hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* ── STATUS BAR ──────────────────────────────────── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--c1);
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--tan3);
+  flex-shrink: 0;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.sp-ok  { background: var(--grn2); color: var(--grn); border: 1px solid var(--grn3); }
+.sp-low { background: var(--ora2); color: var(--ora); border: 1px solid rgba(230,126,34,.2); }
+.sp-out { background: var(--red2); color: var(--red); border: 1px solid rgba(192,57,43,.2); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── MAIN AREA ───────────────────────────────────── */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ─────────────────────────────────────── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--c1);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 8px;
+}
+.nav-section { padding: 4px 0; }
+.nav-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tan4);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 8px 8px 4px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--tan3);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background .15s;
+  user-select: none;
+}
+.nav-item:hover { background: var(--c3); color: var(--tan2); }
+.nav-item.on { background: var(--gl2); color: var(--tan); font-weight: 600; }
+.nav-item.on .nav-icon { color: var(--gl); }
+.nav-icon { width: 16px; color: var(--tan4); flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* ── CONTENT ─────────────────────────────────────── */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.view { display: none; }
+.view.on { display: flex; flex-direction: column; flex: 1; }
+
+/* ── TOOLBAR ─────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--c1);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.toolbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tan);
+  margin-right: 4px;
+}
+.toolbar-sub { font-size: 12px; color: var(--tan3); }
+.ml-auto { margin-left: auto; }
+
+/* ── SEARCH BOX ──────────────────────────────────── */
+.search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-wrap svg {
+  position: absolute;
+  left: 9px;
+  color: var(--tan4);
+  pointer-events: none;
+}
+.search-inp {
+  height: 34px;
+  padding: 0 10px 0 30px;
+  background: var(--c2);
+  border: 1px solid var(--ln2);
+  border-radius: 8px;
+  color: var(--tan);
+  font-size: 13px;
+  font-family: var(--sans);
+  outline: none;
+  width: 220px;
+  transition: border-color .15s;
+}
+.search-inp:focus { border-color: var(--tan2); }
+.search-inp::placeholder { color: var(--tan4); }
+
+/* ── FILTER TABS ─────────────────────────────────── */
+.filter-tabs { display: flex; gap: 4px; }
+.ftab {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--ln2);
+  background: var(--c2);
+  color: var(--tan3);
+  transition: all .15s;
+  white-space: nowrap;
+}
+.ftab:hover { background: var(--c3); color: var(--tan2); }
+.ftab.on { background: var(--gl); color: var(--c0); border-color: var(--gl); }
+
+/* ── BUTTONS ─────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--sans);
+  border: none;
+  transition: opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.96); }
+.btn-gold { background: var(--gl); color: var(--c0); }
+.btn-ghost { background: var(--c3); color: var(--tan2); border: 1px solid var(--ln2); }
+.btn-red { background: var(--red); color: #fff; }
+.btn-grn { background: var(--grn); color: #fff; }
+.btn-sm { height: 30px; padding: 0 10px; font-size: 12px; }
+.btn-icon { width: 34px; padding: 0; justify-content: center; }
+
+/* ── TABLE ───────────────────────────────────────── */
+.tbl-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--c1);
+}
+th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tan3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+th:hover { color: var(--tan2); }
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+tbody tr { transition: background .1s; }
+tbody tr:hover { background: var(--c2); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ── STOCK LEVEL PILL ────────────────────────────── */
+.level-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.lp-ok  { background: var(--grn2); color: var(--grn); }
+.lp-low { background: var(--ora2); color: var(--ora); }
+.lp-out { background: var(--red2); color: var(--red); }
+.lp-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ── QTY BADGE ───────────────────────────────────── */
+.qty-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.qty-val {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tan);
+  min-width: 40px;
+}
+.qty-unit { font-size: 11px; color: var(--tan3); }
+
+/* ── PROGRESS BAR ────────────────────────────────── */
+.stock-bar {
+  width: 80px;
+  height: 5px;
+  background: var(--c4);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.stock-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .3s;
+}
+.sbf-ok  { background: var(--grn); }
+.sbf-low { background: var(--ora); }
+.sbf-out { background: var(--red); }
+
+/* ── OVERLAYS ────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(4px);
+  z-index: 500;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+.overlay.on { display: flex; }
+@media(min-width:600px) { .overlay { align-items: center; } }
+
+.modal {
+  background: var(--c2);
+  border: 1px solid var(--ln2);
+  border-radius: 14px 14px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+@media(min-width:600px) { .modal { border-radius: 14px; } }
+.modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tan);
+  margin-bottom: 16px;
+}
+.modal-close {
+  position: absolute;
+  top: 16px; right: 16px;
+  width: 28px; height: 28px;
+  background: var(--c3);
+  border: 1px solid var(--ln2);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--tan3);
+  font-size: 13px;
+}
+
+/* ── FORM ────────────────────────────────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.form-grid.full { grid-template-columns: 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group.span2 { grid-column: 1 / -1; }
+.form-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tan3);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+.inp {
+  height: 38px;
+  padding: 0 10px;
+  background: var(--c3);
+  border: 1px solid var(--ln2);
+  border-radius: 8px;
+  color: var(--tan);
+  font-size: 13px;
+  font-family: var(--sans);
+  outline: none;
+  transition: border-color .15s;
+  width: 100%;
+}
+.inp:focus { border-color: var(--tan2); }
+.inp::placeholder { color: var(--tan4); }
+select.inp { cursor: pointer; }
+textarea.inp { height: auto; padding: 8px 10px; resize: vertical; }
+.modal-foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* ── TRANSACTION SIDEBAR ─────────────────────────── */
+.tx-panel {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--c1);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tx-hdr {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tan2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tx-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.tx-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  transition: background .1s;
+}
+.tx-row:hover { background: var(--c2); }
+.tx-row:last-child { border-bottom: none; }
+.tx-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.tx-in  { background: var(--grn2); color: var(--grn); }
+.tx-out { background: var(--red2); color: var(--red); }
+.tx-adj { background: var(--blu2); color: var(--blu); }
+.tx-wst { background: var(--ora2); color: var(--ora); }
+.tx-body { flex: 1; min-width: 0; }
+.tx-name { font-weight: 600; color: var(--tan2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-meta { color: var(--tan3); margin-top: 1px; font-size: 11px; }
+.tx-qty { font-family: var(--mono); font-weight: 700; font-size: 12px; flex-shrink: 0; margin-top: 2px; }
+.tx-qty.pos { color: var(--grn); }
+.tx-qty.neg { color: var(--red); }
+
+/* ── KPI STRIP ───────────────────────────────────── */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.kpi-card {
+  background: var(--c1);
+  padding: 12px 16px;
+}
+.kpi-lbl { font-size: 10px; font-weight: 700; color: var(--tan3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 4px; }
+.kpi-val { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--tan); line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--tan3); margin-top: 3px; }
+
+/* ── ADJ MODAL SPECIAL ───────────────────────────── */
+.adj-type-row { display: flex; gap: 6px; margin-bottom: 14px; }
+.adj-type-btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--ln2);
+  background: var(--c3);
+  color: var(--tan3);
+  transition: all .15s;
+  font-family: var(--sans);
+}
+.adj-type-btn.on.receive { background: var(--grn2); color: var(--grn); border-color: rgba(39,174,96,.3); }
+.adj-type-btn.on.issue   { background: var(--red2);  color: var(--red);  border-color: rgba(192,57,43,.3); }
+.adj-type-btn.on.adjust  { background: var(--blu2);  color: var(--blu);  border-color: rgba(41,128,185,.3); }
+.adj-type-btn.on.waste   { background: var(--ora2);  color: var(--ora);  border-color: rgba(230,126,34,.3); }
+
+/* ── TOAST ───────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.toast-item {
+  background: var(--c3);
+  color: var(--tan);
+  border: 1px solid var(--ln2);
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  animation: toastin .25s ease;
+  white-space: nowrap;
+}
+.toast-item.success { background: var(--grn4); color: #fff; border-color: transparent; }
+.toast-item.error   { background: var(--red);  color: #fff; border-color: transparent; }
+.toast-item.warn    { background: var(--ora);  color: #fff; border-color: transparent; }
+@keyframes toastin { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── EMPTY STATE ─────────────────────────────────── */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: var(--tan4);
+  text-align: center;
+}
+.empty-state svg { opacity: .12; margin-bottom: 14px; }
+.empty-state .em-title { font-size: 16px; color: var(--tan3); margin-bottom: 6px; }
+.empty-state .em-sub { font-size: 13px; }
+
+/* ── WASTE + REORDER REPORTS ─────────────────────── */
+.waste-bar-wrap{display:flex;align-items:center;gap:8px}
+.waste-bar{height:5px;flex:1;background:var(--c4);border-radius:3px;overflow:hidden}
+.waste-bar-fill{height:100%;background:var(--red);border-radius:3px}
+.reorder-card{background:var(--c2);border:1px solid var(--ln2);border-radius:10px;padding:14px;display:flex;align-items:flex-start;gap:12px;transition:border-color .15s}
+.reorder-card:hover{border-color:var(--tan2)}
+.reorder-card.urgent{border-color:rgba(192,57,43,.4);background:var(--red2)}
+.reorder-card.low{border-color:rgba(230,126,34,.3);background:var(--ora2)}
+.ro-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
+.ro-icon.urgent{background:rgba(192,57,43,.15)}
+.ro-icon.low   {background:rgba(230,126,34,.12)}
+.ro-body{flex:1;min-width:0}
+.ro-name{font-size:13px;font-weight:700;color:var(--tan);margin-bottom:3px}
+.ro-meta{font-size:11px;color:var(--tan3);line-height:1.6}
+.ro-qty{font-family:var(--mono);font-size:18px;font-weight:700;flex-shrink:0;text-align:right}
+.ro-qty.urgent{color:var(--red)}
+.ro-qty.low   {color:var(--ora)}
+.ro-action{margin-top:8px;display:flex;gap:6px}
+
+/* ── CYCLE COUNT ─────────────────────────────────── */
+.cc-phase{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.cc-open   {background:var(--blu2); color:var(--blu); border:1px solid rgba(74,128,185,.2)}
+.cc-active {background:var(--ora2); color:var(--ora); border:1px solid rgba(230,126,34,.2)}
+.cc-review {background:rgba(180,100,200,.08);color:#b464c8;border:1px solid rgba(180,100,200,.2)}
+.cc-posted {background:var(--grn2); color:var(--grn); border:1px solid rgba(39,174,96,.2)}
+.cc-row{display:grid;grid-template-columns:1fr 90px 90px 90px 80px;gap:8px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--line);font-size:12px;transition:background .1s}
+.cc-row:hover{background:var(--c3)}
+.cc-row:last-child{border-bottom:none}
+.cc-row input{height:34px;font-size:14px;font-family:var(--mono);text-align:right;font-weight:700}
+.cc-var-ok  {color:var(--grn);font-weight:700;text-align:right;font-family:var(--mono)}
+.cc-var-warn{color:var(--ora);font-weight:700;text-align:right;font-family:var(--mono)}
+.cc-var-bad {color:var(--red);font-weight:700;text-align:right;font-family:var(--mono)}
+.cc-cat-hdr{padding:7px 16px;background:var(--c3);font-size:10px;font-weight:700;color:var(--tan3);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.count-progress{height:3px;background:var(--c4);border-radius:2px;overflow:hidden;margin-top:4px}
+.count-progress-fill{height:100%;background:var(--gl);border-radius:2px;transition:width .3s}
+
+/* ── PO DETAIL + RECEIVE ─────────────────────────── */
+.po-detail-panel{background:var(--c2);border:1px solid var(--ln2);border-radius:12px;margin:14px 16px 0;overflow:hidden}
+.po-detail-hdr{padding:12px 16px;background:var(--c3);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.po-receive-row{display:grid;grid-template-columns:1fr 80px 80px 80px 80px;gap:8px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12px}
+.po-receive-row:last-child{border-bottom:none}
+.po-receive-row input{height:32px;font-size:13px;font-family:var(--mono)}
+.po-receive-lbl{padding:6px 16px;background:var(--c3);font-size:10px;font-weight:700;color:var(--tan4);text-transform:uppercase;letter-spacing:.8px;display:grid;grid-template-columns:1fr 80px 80px 80px 80px;gap:8px;border-bottom:1px solid var(--line)}
+.variance-ok   {color:var(--grn);font-weight:700;text-align:right}
+.variance-warn {color:var(--ora);font-weight:700;text-align:right}
+.variance-bad  {color:var(--red);font-weight:700;text-align:right}
+.ap-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.ap-unpaid{background:var(--red2);color:var(--red);border:1px solid rgba(192,57,43,.2)}
+.ap-paid  {background:var(--grn2);color:var(--grn);border:1px solid rgba(39,174,96,.2)}
+
+/* ── PURCHASE ORDERS ─────────────────────────────── */
+.po-status{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+.pos-draft    {background:rgba(74,128,185,.1); color:var(--blu);  border:1px solid rgba(74,128,185,.2)}
+.pos-submitted{background:var(--ora2);         color:var(--ora);  border:1px solid rgba(230,126,34,.2)}
+.pos-approved {background:var(--grn2);         color:var(--grn);  border:1px solid rgba(39,174,96,.2)}
+.pos-received {background:rgba(212,170,106,.08);color:var(--tan2);border:1px solid var(--ln2)}
+.pos-cancelled{background:rgba(192,57,43,.08); color:var(--red);  border:1px solid rgba(192,57,43,.15)}
+.po-line{display:grid;grid-template-columns:1fr 70px 80px 80px 24px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.po-line:last-child{border-bottom:none}
+.po-line select,.po-line input{height:32px;font-size:12px}
+.po-line-del{width:24px;height:24px;border-radius:5px;background:var(--red2);color:var(--red);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}
+.po-line-del:hover{background:var(--red);color:#fff}
+.po-suggest-item{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .1s}
+.po-suggest-item:hover{background:var(--c3)}
+.po-suggest-item:last-child{border-bottom:none}
+.po-suggest-chk{width:16px;height:16px;border:1.5px solid var(--ln2);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.po-suggest-chk.on{background:var(--gl);border-color:var(--gl);color:var(--c0)}
+
+/* ── VARIANCE / AUTO-DEDUCT ──────────────────────── */
+.var-row{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line);font-size:12px}
+.var-row:last-child{border-bottom:none}
+.var-name{flex:1;font-weight:600;color:var(--tan2)}
+.var-theory{font-family:var(--mono);color:var(--tan3);min-width:70px;text-align:right}
+.var-actual{font-family:var(--mono);color:var(--tan2);min-width:70px;text-align:right}
+.var-diff{font-family:var(--mono);font-weight:700;min-width:64px;text-align:right}
+.var-diff.ok{color:var(--grn)}
+.var-diff.warn{color:var(--ora)}
+.var-diff.bad{color:var(--red)}
+.deduct-log-row{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:11px}
+.deduct-log-row:last-child{border-bottom:none}
+.dl-item{flex:1;color:var(--tan2);font-weight:600}
+.dl-qty{font-family:var(--mono);color:var(--red);white-space:nowrap}
+.dl-src{color:var(--tan4);font-size:10px;white-space:nowrap}
+.dl-ts{color:var(--tan4);font-size:10px;white-space:nowrap;min-width:60px;text-align:right}
+
+/* ── RECIPE BUILDER ──────────────────────────────── */
+.rec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;padding:16px}
+.rec-card{background:var(--c2);border:1px solid var(--ln2);border-radius:12px;overflow:hidden;transition:border-color .15s}
+.rec-card:hover{border-color:var(--tan2)}
+.rec-card-hdr{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line)}
+.rec-name{font-size:13px;font-weight:700;color:var(--tan)}
+.rec-cat{font-size:10px;color:var(--tan4);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
+.rec-cost-pill{display:inline-flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0}
+.rec-cost-val{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--gl)}
+.rec-cost-lbl{font-size:9px;color:var(--tan4);text-transform:uppercase;letter-spacing:.5px;text-align:right}
+.rec-ing-list{padding:10px 16px}
+.rec-ing-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;border-bottom:1px solid var(--line)}
+.rec-ing-row:last-child{border-bottom:none}
+.rec-ing-name{flex:1;color:var(--tan2)}
+.rec-ing-qty{font-family:var(--mono);color:var(--tan3);font-size:11px;white-space:nowrap}
+.rec-ing-cost{font-family:var(--mono);color:var(--tan4);font-size:11px;white-space:nowrap;min-width:44px;text-align:right}
+.rec-margin{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--c3);font-size:12px}
+.rec-margin-bar{height:4px;border-radius:2px;background:var(--c4);overflow:hidden;flex:1;margin:0 10px}
+.rec-margin-fill{height:100%;border-radius:2px;background:var(--grn)}
+.rec-margin-fill.yellow{background:var(--ora)}
+.rec-margin-fill.red{background:var(--red)}
+.rec-actions{display:flex;gap:6px;padding:10px 16px;border-top:1px solid var(--line)}
+
+/* ── INGREDIENT EDITOR (inside recipe modal) ──────── */
+.ing-editor{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.ing-row-edit{display:grid;grid-template-columns:1fr 80px 60px 30px;gap:6px;align-items:center}
+.ing-row-edit select,.ing-row-edit input{height:34px;font-size:12px}
+.ing-row-del{width:28px;height:28px;border-radius:6px;background:var(--red2);color:var(--red);border:1px solid rgba(192,57,43,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.ing-row-del:hover{background:var(--red);color:#fff}
+.ing-cost-live{font-size:11px;color:var(--tan3);text-align:right;margin-top:-2px}
+
+/* ── RECEIVE HISTORY ─────────────────────────────── */
+.rh-row{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--line);font-size:11px}
+.rh-row:last-child{border-bottom:none}
+.rh-sup{font-weight:600;color:var(--tan2);min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rh-qty{font-family:var(--mono);color:var(--grn);font-weight:700}
+.rh-cost{font-family:var(--mono);color:var(--tan3)}
+.rh-meta{color:var(--tan4);margin-left:auto;white-space:nowrap}
+
+/* ── SUPPLIER ────────────────────────────────────── */
+.sup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:16px}
+.sup-card{background:var(--c2);border:1px solid var(--ln2);border-radius:12px;padding:16px;cursor:pointer;transition:border-color .15s}
+.sup-card:hover{border-color:var(--tan2)}
+.sup-name{font-size:14px;font-weight:700;color:var(--tan);margin-bottom:4px}
+.sup-contact{font-size:12px;color:var(--tan3);display:flex;align-items:center;gap:6px;margin-top:6px}
+.sup-chip{display:inline-flex;align-items:center;gap:4px;background:var(--c3);border:1px solid var(--ln2);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--tan3)}
+.sup-stat-row{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.sup-stat{flex:1;text-align:center}
+.sup-stat-val{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--gl)}
+.sup-stat-lbl{font-size:10px;color:var(--tan4);text-transform:uppercase;letter-spacing:.5px}
+.sup-actions{display:flex;gap:6px;margin-top:10px}
+
+/* ── SCROLLBAR ───────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c4); border-radius: 3px; }
+
+/* ── LOW STOCK ALERT BANNER ──────────────────────── */
+.low-banner {
+  display: none;
+  background: var(--ora2);
+  border-bottom: 1px solid rgba(230,126,34,.25);
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--ora);
+  font-weight: 600;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.low-banner.on { display: flex; }
+.low-banner-items { flex: 1; color: var(--tan3); font-weight: 400; }
+
+/* ── TRANSACTION VIEW TABLE ──────────────────────── */
+.tx-view-row {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.tv-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  white-space: nowrap;
+}
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="app">
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<div class="hdr">
+  <div class="hdr-logo">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    Ceramic <span>/ Stock</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-title" id="hdrBranch">Loading...</div>
+  <div class="hdr-right">
+    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+    <button class="btn btn-gold" onclick="openAddItem()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Item
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════ LOW STOCK ALERT BANNER ════ -->
+<div class="low-banner" id="lowBanner">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <span id="lowBannerTxt">รายการสต็อกต่ำกว่าระดับ par</span>
+  <span class="low-banner-items" id="lowBannerItems"></span>
+  <button class="btn btn-ghost btn-sm" onclick="filterLow()">ดูรายการ</button>
+</div>
+
+<!-- ═══════════════════ STATUS BAR ════════════════ -->
+<div class="status-bar">
+  <div class="status-pill sp-ok"><div class="status-dot"></div><span id="statOk">0</span> In stock</div>
+  <div class="status-pill sp-low"><div class="status-dot"></div><span id="statLow">0</span> Low</div>
+  <div class="status-pill sp-out"><div class="status-dot"></div><span id="statOut">0</span> Out</div>
+  <div style="margin-left:auto;font-size:11px;color:var(--tan4)">Last sync: <span id="lastSync">—</span></div>
+</div>
+
+<!-- ═══════════════════ MAIN ══════════════════════ -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="nav-section">
+      <div class="nav-lbl">Views</div>
+      <div class="nav-item on" onclick="showView('vItems',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Stock Items
+        <span class="nav-badge" id="nbItems">0</span>
+      </div>
+      <div class="nav-item" onclick="showView('vTx',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Transactions
+      </div>
+      <div class="nav-item" onclick="showView('vSuppliers',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Suppliers
+        <span class="nav-badge" id="nbSuppliers" style="background:var(--tan3)">0</span>
+      </div>
+      <div class="nav-item" onclick="showView('vReport',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reports
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-lbl">Operations</div>
+      <div class="nav-item" onclick="showView('vCycleCount',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        Cycle Count
+        <span class="nav-badge" id="nbCount" style="background:var(--ora);display:none">Active</span>
+      </div>
+      <div class="nav-item" onclick="showView('vWaste',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        Waste Report
+      </div>
+      <div class="nav-item" onclick="showView('vReorder',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+        Reorder Report
+        <span class="nav-badge" id="nbReorder" style="background:var(--red)">0</span>
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-lbl">Actions</div>
+      <div class="nav-item" onclick="showView('vPO',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Purchase Orders
+        <span class="nav-badge" id="nbPO" style="background:var(--blu)">0</span>
+      </div>
+      <div class="nav-item" onclick="showView('vVariance',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Theoretical vs Actual
+      </div>
+      <div class="nav-item" onclick="showView('vRecipes',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Recipes / COGS
+        <span class="nav-badge" id="nbRecipes" style="background:var(--tan3)">0</span>
+      </div>
+      <div class="nav-item" onclick="showView('vReceive',this)">
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 103 16.29"/></svg>
+        Receive History
+      </div>
+        <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 103 16.29"/></svg>
+        Receive Stock
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-lbl">Categories</div>
+      <div id="catList">
+        <div class="nav-item on" id="cat-all" onclick="filterCat('all',this)">
+          <svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+          All Items
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT AREA -->
+  <div class="content">
+
+    <!-- ════ VIEW: ITEMS ════ -->
+    <div class="view on" id="vItems">
+      <div class="toolbar">
+        <div>
+          <div class="toolbar-title">Stock Items</div>
+        </div>
+        <div class="search-wrap">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-inp" type="text" id="itemSearch" placeholder="ค้นหาชื่อ, SKU, category..." oninput="filterItems()">
+        </div>
+        <div class="filter-tabs ml-auto">
+          <button class="ftab on" onclick="filterStatus('all',this)">All</button>
+          <button class="ftab" onclick="filterStatus('low',this)">Low</button>
+          <button class="ftab" onclick="filterStatus('out',this)">Out</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table id="itemsTable">
+          <thead>
+            <tr>
+              <th onclick="sortBy('name')">Item ↕</th>
+              <th onclick="sortBy('cat')">Category</th>
+              <th onclick="sortBy('qty')">Qty ↕</th>
+              <th>Level</th>
+              <th onclick="sortBy('cost')">Unit Cost ↕</th>
+              <th>Par Min/Max</th>
+              <th>Last Updated</th>
+              <th style="width:100px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="itemsTbody">
+          </tbody>
+        </table>
+        <div class="empty-state" id="itemsEmpty" style="display:none">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <div class="em-title">No items found</div>
+          <div class="em-sub">Add your first stock item to get started</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: PURCHASE ORDERS ════ -->
+    <div class="view" id="vPO">
+      <div class="toolbar">
+        <div class="toolbar-title">Purchase Orders</div>
+        <div class="filter-tabs ml-auto">
+          <button class="ftab on" onclick="filterPO('all',this)">All</button>
+          <button class="ftab" onclick="filterPO('draft',this)">Draft</button>
+          <button class="ftab" onclick="filterPO('submitted',this)">Submitted</button>
+          <button class="ftab" onclick="filterPO('approved',this)">Approved</button>
+        </div>
+        <button class="btn btn-ghost" onclick="openSuggestPO()" style="gap:5px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Auto-suggest
+        </button>
+        <button class="btn btn-gold" onclick="openNewPO()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New PO
+        </button>
+      </div>
+      <!-- KPI strip -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line);flex-shrink:0">
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Total POs</div><div class="kpi-val" id="po-kpi-total">0</div></div>
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Pending</div><div class="kpi-val" id="po-kpi-pending" style="color:var(--ora)">0</div></div>
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">This Month Value</div><div class="kpi-val" id="po-kpi-value">฿0</div></div>
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Items Below Par</div><div class="kpi-val" id="po-kpi-low" style="color:var(--red)">0</div></div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>PO Number</th>
+              <th>Supplier</th>
+              <th>Items</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Payment</th>
+              <th>Created</th>
+              <th style="width:160px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="poTbody"></tbody>
+        </table>
+        <div class="empty-state" id="poEmpty" style="display:none">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div class="em-title">No purchase orders</div>
+          <div class="em-sub">สร้าง PO หรือกด Auto-suggest เพื่อ draft อัตโนมัติ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: WASTE REPORT ════ -->
+    <div class="view" id="vWaste">
+      <div class="toolbar">
+        <div class="toolbar-title">Waste Report</div>
+        <select class="inp ml-auto" id="wastePeriod" style="height:34px;max-width:140px" onchange="renderWaste()">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="exportWasteCSV()">Export CSV</button>
+        <button class="btn btn-gold" onclick="openAdjModal('waste')">+ Log Waste</button>
+      </div>
+      <!-- KPI strip -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line);flex-shrink:0">
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Waste Events</div><div class="kpi-val" id="w-count">0</div></div>
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Total Cost</div><div class="kpi-val" id="w-cost" style="color:var(--red)">฿0</div></div>
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Top Wasted Item</div><div class="kpi-val" id="w-top" style="font-size:13px">—</div></div>
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">% of Stock Value</div><div class="kpi-val" id="w-pct">0%</div></div>
+      </div>
+      <!-- Waste by item table -->
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Category</th>
+              <th>Qty Wasted</th>
+              <th>Cost</th>
+              <th>% of Waste</th>
+              <th>Last Waste</th>
+              <th>Events</th>
+            </tr>
+          </thead>
+          <tbody id="wasteTbody"></tbody>
+        </table>
+        <div class="empty-state" id="wasteEmpty" style="display:none">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          <div class="em-title">No waste logged</div>
+          <div class="em-sub">บันทึก waste ด้วยปุ่ม Adjust Stock → Waste</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: REORDER REPORT ════ -->
+    <div class="view" id="vReorder">
+      <div class="toolbar">
+        <div class="toolbar-title">Reorder Report</div>
+        <div style="font-size:12px;color:var(--tan3)">รายการที่ต้องสั่งซื้อ</div>
+        <div class="ml-auto" style="display:flex;gap:8px">
+          <div class="filter-tabs">
+            <button class="ftab on" onclick="filterReorder('all',this)">All</button>
+            <button class="ftab" onclick="filterReorder('urgent',this)">Out of Stock</button>
+            <button class="ftab" onclick="filterReorder('low',this)">Low</button>
+          </div>
+          <button class="btn btn-gold" onclick="createPOFromReorder()">Create PO from All</button>
+        </div>
+      </div>
+      <!-- KPI strip -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line);flex-shrink:0">
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Need Reorder</div><div class="kpi-val" id="ro-count">0</div></div>
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Est. Reorder Cost</div><div class="kpi-val" id="ro-cost">฿0</div></div>
+        <div style="background:var(--c1);padding:10px 16px"><div class="kpi-lbl">Suppliers Needed</div><div class="kpi-val" id="ro-sups">0</div></div>
+      </div>
+      <div id="reorderGrid" style="padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;overflow-y:auto"></div>
+      <div class="empty-state" id="reorderEmpty" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+        <div class="em-title">All stocked up! 🎉</div>
+        <div class="em-sub">ไม่มีรายการที่ต้องสั่งซื้อขณะนี้</div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: CYCLE COUNT ════ -->
+    <div class="view" id="vCycleCount">
+      <div class="toolbar">
+        <div>
+          <div class="toolbar-title">Cycle Count</div>
+          <div class="toolbar-sub" id="ccStatusLbl">No active count</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+          <span id="ccProgress" style="font-size:12px;color:var(--tan3)"></span>
+          <select class="inp" id="ccCatFilter" style="height:34px;max-width:160px" onchange="renderCycleCount()">
+            <option value="all">All Categories</option>
+          </select>
+        </div>
+        <div id="ccActions" style="display:flex;gap:8px">
+          <button class="btn btn-gold" id="ccStartBtn" onclick="startCycleCount()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Start Count
+          </button>
+          <button class="btn btn-ghost" id="ccReviewBtn" style="display:none" onclick="reviewCycleCount()">Review Variances</button>
+          <button class="btn btn-grn"   id="ccPostBtn"   style="display:none" onclick="postCycleCount()">Post Adjustments</button>
+          <button class="btn btn-ghost btn-sm" id="ccDiscardBtn" style="display:none;color:var(--red)" onclick="discardCycleCount()">Discard</button>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div id="ccProgressWrap" style="padding:0 16px 0;display:none">
+        <div class="count-progress"><div class="count-progress-fill" id="ccProgressBar" style="width:0%"></div></div>
+      </div>
+
+      <!-- Column headers -->
+      <div id="ccColHdr" style="display:none;padding:8px 16px 0;background:var(--c1);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5">
+        <div style="display:grid;grid-template-columns:1fr 90px 90px 90px 80px;gap:8px;font-size:10px;font-weight:700;color:var(--tan4);text-transform:uppercase;letter-spacing:.8px;padding:0 0 8px">
+          <span>Item</span>
+          <span style="text-align:right">System Qty</span>
+          <span style="text-align:right">Count Qty</span>
+          <span style="text-align:right">Last Count</span>
+          <span style="text-align:right">Variance</span>
+        </div>
+      </div>
+
+      <div class="tbl-wrap" style="padding:0">
+        <div id="ccList"></div>
+        <div class="empty-state" id="ccEmpty">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          <div class="em-title">Ready to count</div>
+          <div class="em-sub">กด Start Count เพื่อเริ่มนับสต็อก</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: THEORETICAL VS ACTUAL ════ -->
+    <div class="view" id="vVariance">
+      <div class="toolbar">
+        <div class="toolbar-title">Theoretical vs Actual</div>
+        <div style="font-size:12px;color:var(--tan3)">เปรียบเทียบสต็อกที่ควรหาย vs หายจริง</div>
+        <div class="ml-auto" style="display:flex;gap:8px">
+          <select class="inp" id="varPeriod" style="height:34px;max-width:140px" onchange="renderVariance()">
+            <option value="today">Today</option>
+            <option value="week" selected>This Week</option>
+            <option value="month">This Month</option>
+          </select>
+          <button class="btn btn-gold" onclick="runAutoDeduct()" title="Auto-deduct based on recent orders">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            Sync Deductions
+          </button>
+        </div>
+      </div>
+      <!-- KPI strip -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line);flex-shrink:0">
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Cups Sold (est.)</div>
+          <div class="kpi-val" id="var-cups">0</div>
+        </div>
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Theoretical COGS</div>
+          <div class="kpi-val" id="var-theory-cogs">฿0</div>
+        </div>
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Variance Items</div>
+          <div class="kpi-val" id="var-count" style="color:var(--ora)">0</div>
+        </div>
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Waste / Spillage</div>
+          <div class="kpi-val" id="var-waste" style="color:var(--red)">0</div>
+        </div>
+      </div>
+      <div style="display:flex;flex:1;overflow:hidden">
+        <!-- Variance table -->
+        <div style="flex:1;overflow-y:auto;border-right:1px solid var(--line)">
+          <div style="padding:10px 16px;font-size:10px;font-weight:700;color:var(--tan4);text-transform:uppercase;letter-spacing:.8px;display:grid;grid-template-columns:1fr 80px 80px 80px;gap:8px;border-bottom:1px solid var(--line)">
+            <span>Item</span><span style="text-align:right">Theory</span><span style="text-align:right">Actual</span><span style="text-align:right">Variance</span>
+          </div>
+          <div id="varRows">
+            <div class="empty-state" style="padding:32px">
+              <div class="em-sub">กด Sync Deductions เพื่อคำนวณ</div>
+            </div>
+          </div>
+        </div>
+        <!-- Deduction log -->
+        <div style="width:300px;flex-shrink:0;overflow-y:auto">
+          <div style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--tan3);border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.5px">Auto-Deduction Log</div>
+          <div id="deductLog">
+            <div style="padding:24px;text-align:center;font-size:12px;color:var(--tan4)">No deductions yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: RECIPES / COGS ════ -->
+    <div class="view" id="vRecipes">
+      <div class="toolbar">
+        <div class="toolbar-title">Recipes & COGS</div>
+        <div class="search-wrap">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-inp" type="text" id="recSearch" placeholder="ค้นหาชื่อเมนู..." oninput="renderRecipes()">
+        </div>
+        <div class="filter-tabs ml-auto">
+          <button class="ftab on" onclick="filterRecCat('all',this)">All</button>
+          <button class="ftab" onclick="filterRecCat('has',this)">Has Recipe</button>
+          <button class="ftab" onclick="filterRecCat('missing',this)">Missing</button>
+        </div>
+        <button class="btn btn-gold" onclick="openAddRecipe()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Recipe
+        </button>
+      </div>
+      <!-- Summary strip -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line);flex-shrink:0">
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Recipes</div>
+          <div class="kpi-val" id="recKpi-count">0</div>
+        </div>
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Avg COGS</div>
+          <div class="kpi-val" id="recKpi-cogs">฿0</div>
+        </div>
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Avg Margin</div>
+          <div class="kpi-val" id="recKpi-margin">—</div>
+        </div>
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Missing Recipes</div>
+          <div class="kpi-val" id="recKpi-missing" style="color:var(--ora)">0</div>
+        </div>
+      </div>
+      <div id="recGrid" class="rec-grid"></div>
+      <div class="empty-state" id="recEmpty" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <div class="em-title">No recipes yet</div>
+        <div class="em-sub">สร้าง recipe เพื่อคำนวณ COGS ต่อ cup</div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: RECEIVE HISTORY ════ -->
+    <div class="view" id="vReceive">
+      <div class="toolbar">
+        <div class="toolbar-title">Receive History</div>
+        <div class="search-wrap">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-inp" type="text" id="rhSearch" placeholder="ค้นหา item, supplier..." oninput="renderReceiveHistory()">
+        </div>
+        <select class="inp ml-auto" id="rhSupFilter" style="max-width:180px;height:34px" onchange="renderReceiveHistory()">
+          <option value="">All Suppliers</option>
+        </select>
+        <button class="btn btn-gold" onclick="openAdjModal('receive')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/></svg>
+          Receive Stock
+        </button>
+      </div>
+      <!-- Summary strip -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line);flex-shrink:0">
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">This Month Receives</div>
+          <div class="kpi-val" id="rh-count">0</div>
+        </div>
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Total Cost</div>
+          <div class="kpi-val" id="rh-cost">฿0</div>
+        </div>
+        <div style="background:var(--c1);padding:10px 16px">
+          <div class="kpi-lbl">Unique Items</div>
+          <div class="kpi-val" id="rh-items">0</div>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Item</th>
+              <th>Supplier</th>
+              <th>Invoice</th>
+              <th>Qty</th>
+              <th>Unit Cost</th>
+              <th>Total</th>
+              <th>Staff</th>
+            </tr>
+          </thead>
+          <tbody id="rhTbody"></tbody>
+        </table>
+        <div class="empty-state" id="rhEmpty" style="display:none">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/></svg>
+          <div class="em-title">No receive history</div>
+          <div class="em-sub">กด Receive Stock เพื่อบันทึกการรับสินค้า</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: SUPPLIERS ════ -->
+    <div class="view" id="vSuppliers">
+      <div class="toolbar">
+        <div class="toolbar-title">Suppliers</div>
+        <div class="search-wrap">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-inp" type="text" id="supSearch" placeholder="ค้นหาชื่อ, เบอร์, ประเภท..." oninput="renderSuppliers()">
+        </div>
+        <div class="filter-tabs ml-auto">
+          <button class="ftab on" id="supf-all"    onclick="filterSup('all',this)">All</button>
+          <button class="ftab"    id="supf-active" onclick="filterSup('active',this)">Active</button>
+          <button class="ftab"    id="supf-paused" onclick="filterSup('paused',this)">Paused</button>
+        </div>
+        <button class="btn btn-gold" onclick="openAddSupplier()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Supplier
+        </button>
+      </div>
+      <div id="supGrid" class="sup-grid"></div>
+      <div class="empty-state" id="supEmpty" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <div class="em-title">No suppliers yet</div>
+        <div class="em-sub">เพิ่ม supplier เพื่อติดตามการรับสินค้า</div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: TRANSACTIONS ════ -->
+    <div class="view" id="vTx">
+      <div class="toolbar">
+        <div class="toolbar-title">Transaction Log</div>
+        <div class="filter-tabs ml-auto">
+          <button class="ftab on" onclick="filterTxType('all',this)">All</button>
+          <button class="ftab" onclick="filterTxType('receive',this)">Receive</button>
+          <button class="ftab" onclick="filterTxType('issue',this)">Issue</button>
+          <button class="ftab" onclick="filterTxType('adjust',this)">Adjust</button>
+          <button class="ftab" onclick="filterTxType('waste',this)">Waste</button>
+        </div>
+      </div>
+      <div class="tbl-wrap" id="txListWrap">
+        <div id="txRows"></div>
+        <div class="empty-state" id="txEmpty" style="display:none">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+          <div class="em-title">No transactions yet</div>
+          <div class="em-sub">Stock movements will appear here</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ VIEW: REPORTS ════ -->
+    <div class="view" id="vReport">
+      <div class="toolbar">
+        <div class="toolbar-title">Stock Report</div>
+        <button class="btn btn-ghost btn-sm ml-auto" onclick="exportCSV()">Export CSV</button>
+      </div>
+      <!-- KPI strip -->
+      <div class="kpi-strip">
+        <div class="kpi-card">
+          <div class="kpi-lbl">Total SKUs</div>
+          <div class="kpi-val" id="rptSkus">0</div>
+          <div class="kpi-sub">unique items</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-lbl">Total Value</div>
+          <div class="kpi-val" id="rptValue">฿0</div>
+          <div class="kpi-sub">at current cost</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-lbl">Low Stock</div>
+          <div class="kpi-val" id="rptLow" style="color:var(--ora)">0</div>
+          <div class="kpi-sub">need reorder</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-lbl">Out of Stock</div>
+          <div class="kpi-val" id="rptOut" style="color:var(--red)">0</div>
+          <div class="kpi-sub">critical</div>
+        </div>
+      </div>
+      <!-- Report table -->
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Category</th>
+              <th>Qty</th>
+              <th>Unit Cost</th>
+              <th>Total Value</th>
+              <th>% of Value</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="rptTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════════════════ OVERLAYS ══════════════════ -->
+
+<!-- ADD/EDIT ITEM -->
+<div class="overlay" id="itemOv" onclick="if(event.target===this)closeOv('itemOv')">
+  <div class="modal" style="position:relative">
+    <div class="modal-close" onclick="closeOv('itemOv')">✕</div>
+    <div class="modal-title" id="itemOvTitle">Add Stock Item</div>
+    <div class="form-grid">
+      <div class="form-group span2">
+        <label class="form-lbl">Item Name *</label>
+        <input type="text" class="inp" id="fi-name" placeholder="e.g. Green Tea Leaves">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Category</label>
+        <select class="inp" id="fi-cat">
+          <option value="Tea">Tea</option>
+          <option value="Milk">Milk & Cream</option>
+          <option value="Syrup">Syrup & Flavoring</option>
+          <option value="Packaging">Packaging</option>
+          <option value="Topping">Topping</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Unit</label>
+        <select class="inp" id="fi-unit">
+          <option value="g">Gram (g)</option>
+          <option value="kg">Kilogram (kg)</option>
+          <option value="ml">Milliliter (ml)</option>
+          <option value="L">Liter (L)</option>
+          <option value="pcs">Pieces (pcs)</option>
+          <option value="box">Box</option>
+          <option value="pack">Pack</option>
+          <option value="bottle">Bottle</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Current Qty</label>
+        <input type="number" class="inp" id="fi-qty" placeholder="0" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Unit Cost (฿)</label>
+        <input type="number" class="inp" id="fi-cost" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Par Min</label>
+        <input type="number" class="inp" id="fi-pmin" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Par Max</label>
+        <input type="number" class="inp" id="fi-pmax" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">SKU / Barcode</label>
+        <input type="text" class="inp" id="fi-sku" placeholder="optional">
+      </div>
+      <div class="form-group span2">
+        <label class="form-lbl">Notes</label>
+        <input type="text" class="inp" id="fi-note" placeholder="optional">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeOv('itemOv')">Cancel</button>
+      <button class="btn btn-gold" style="flex:2;justify-content:center" onclick="saveItem()">Save Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADJUST / RECEIVE -->
+<div class="overlay" id="adjOv" onclick="if(event.target===this)closeOv('adjOv')">
+  <div class="modal" style="position:relative;max-width:520px">
+    <div class="modal-close" onclick="closeOv('adjOv')">✕</div>
+    <div class="modal-title" id="adjOvTitle">Stock Movement</div>
+    <div class="adj-type-row">
+      <button class="adj-type-btn on receive" id="adj-receive" onclick="setAdjType('receive')">↓ Receive</button>
+      <button class="adj-type-btn issue"   id="adj-issue"   onclick="setAdjType('issue')">↑ Issue</button>
+      <button class="adj-type-btn adjust"  id="adj-adjust"  onclick="setAdjType('adjust')">↔ Adjust</button>
+      <button class="adj-type-btn waste"   id="adj-waste"   onclick="setAdjType('waste')">✕ Waste</button>
+    </div>
+
+    <!-- Supplier + Invoice row (receive only) -->
+    <div id="adj-sup-row" style="display:none">
+      <div class="form-grid" style="margin-bottom:0">
+        <div class="form-group">
+          <label class="form-lbl">Supplier</label>
+          <select class="inp" id="adj-supplier" onchange="onSupplierChange()">
+            <option value="">-- Select supplier --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-lbl">Invoice / Ref No.</label>
+          <input type="text" class="inp" id="adj-invoice" placeholder="INV-2024-001">
+        </div>
+      </div>
+      <div style="height:10px"></div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group span2">
+        <label class="form-lbl">Item</label>
+        <select class="inp" id="adj-item" onchange="onAdjItemChange()">
+          <option value="">Select item...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Quantity</label>
+        <input type="number" class="inp" id="adj-qty" placeholder="0" min="0.01" step="0.01" oninput="updateAdjPreview()">
+      </div>
+      <div class="form-group" id="adj-cost-wrap">
+        <label class="form-lbl">Unit Cost (฿) <span id="adj-cost-hint" style="color:var(--tan4);font-weight:400;font-size:10px"></span></label>
+        <input type="number" class="inp" id="adj-cost" placeholder="0.00" min="0" step="0.01" oninput="updateAdjPreview()">
+      </div>
+      <div class="form-group span2">
+        <label class="form-lbl">Reason / Note</label>
+        <input type="text" class="inp" id="adj-note" placeholder="e.g. Morning receive from supplier">
+      </div>
+    </div>
+
+    <div id="adj-preview" style="background:var(--c3);border:1px solid var(--ln2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--tan3);margin-bottom:8px;display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span>Current: <span id="adj-cur" style="color:var(--tan);font-weight:700">—</span></span>
+        <span style="color:var(--tan4)">→</span>
+        <span>After: <span id="adj-after" style="color:var(--gl);font-weight:700">—</span></span>
+        <span id="adj-total-cost" style="color:var(--tan3)"></span>
+      </div>
+    </div>
+
+    <!-- Receive history for selected item (receive mode only) -->
+    <div id="adj-history" style="display:none;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;color:var(--tan4);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Recent receives for this item</div>
+      <div id="adj-history-rows" style="background:var(--c3);border:1px solid var(--ln2);border-radius:8px;overflow:hidden;font-size:11px"></div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeOv('adjOv')">Cancel</button>
+      <button class="btn btn-gold" style="flex:2;justify-content:center" onclick="saveAdj()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECEIVE AGAINST PO -->
+<div class="overlay" id="receivePoOv" onclick="if(event.target===this)closeOv('receivePoOv')">
+  <div class="modal" style="position:relative;max-width:620px">
+    <div class="modal-close" onclick="closeOv('receivePoOv')">✕</div>
+    <div class="modal-title" id="rpOvTitle">Receive Against PO</div>
+
+    <!-- PO Summary -->
+    <div style="background:var(--c3);border:1px solid var(--ln2);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;gap:20px;font-size:12px">
+      <div><span style="color:var(--tan4)">PO: </span><span style="color:var(--gl);font-family:var(--mono);font-weight:700" id="rp-ponum">—</span></div>
+      <div><span style="color:var(--tan4)">Supplier: </span><span style="color:var(--tan2);font-weight:600" id="rp-sup">—</span></div>
+      <div><span style="color:var(--tan4)">PO Total: </span><span style="color:var(--gl);font-family:var(--mono)" id="rp-total">—</span></div>
+    </div>
+
+    <!-- Receive rows -->
+    <div class="po-receive-lbl">
+      <span>Item</span><span style="text-align:right">Ordered</span>
+      <span style="text-align:right">Received</span>
+      <span style="text-align:right">Actual Qty</span>
+      <span style="text-align:right">Variance</span>
+    </div>
+    <div id="rpRows" style="background:var(--c2);border:1px solid var(--ln2);border-radius:0 0 8px 8px;overflow:hidden;margin-bottom:12px"></div>
+
+    <!-- Invoice + note -->
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-lbl">Invoice No.</label>
+        <input type="text" class="inp" id="rp-invoice" placeholder="INV-2024-XXX">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Delivery Date</label>
+        <input type="date" class="inp" id="rp-deldate">
+      </div>
+      <div class="form-group span2">
+        <label class="form-lbl">Remarks</label>
+        <input type="text" class="inp" id="rp-note" placeholder="หมายเหตุการรับของ เช่น สินค้าชำรุด 2 ชิ้น">
+      </div>
+    </div>
+
+    <!-- Receive summary -->
+    <div style="background:var(--c3);border:1px solid var(--ln2);border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="color:var(--tan3)">Actual Receive Value</span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--gl)" id="rp-actual-val">฿0.00</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--tan3)">Variance vs PO</span>
+        <span style="font-family:var(--mono);font-weight:700" id="rp-variance-total">฿0.00</span>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeOv('receivePoOv')">Cancel</button>
+      <button class="btn btn-gold"  style="flex:2;justify-content:center" onclick="confirmReceivePO()">Confirm Receive & Update Stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW / EDIT PO -->
+<div class="overlay" id="poOv" onclick="if(event.target===this)closeOv('poOv')">
+  <div class="modal" style="position:relative;max-width:580px">
+    <div class="modal-close" onclick="closeOv('poOv')">✕</div>
+    <div class="modal-title" id="poOvTitle">New Purchase Order</div>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-group">
+        <label class="form-lbl">Supplier *</label>
+        <select class="inp" id="po-supplier" onchange="onPOSupplierChange()">
+          <option value="">-- Select supplier --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Expected Delivery</label>
+        <input type="date" class="inp" id="po-date">
+      </div>
+      <div class="form-group span2">
+        <label class="form-lbl">Notes</label>
+        <input type="text" class="inp" id="po-note" placeholder="หมายเหตุสำหรับ supplier">
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span style="font-size:11px;font-weight:700;color:var(--tan3);text-transform:uppercase;letter-spacing:.8px">Items</span>
+      <button class="btn btn-ghost btn-sm" onclick="addPOLine()">+ Add Item</button>
+    </div>
+    <div id="poLineEditor" style="margin-bottom:10px"></div>
+
+    <!-- PO Total -->
+    <div style="background:var(--c3);border:1px solid var(--ln2);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:4px">
+      <span style="color:var(--tan3)">Total Order Value</span>
+      <span style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--gl)" id="po-total-preview">฿0.00</span>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeOv('poOv')">Cancel</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="savePO('draft')">Save Draft</button>
+      <button class="btn btn-gold"  style="flex:2;justify-content:center" onclick="savePO('submitted')">Submit PO</button>
+    </div>
+  </div>
+</div>
+
+<!-- AUTO-SUGGEST PO -->
+<div class="overlay" id="suggestOv" onclick="if(event.target===this)closeOv('suggestOv')">
+  <div class="modal" style="position:relative;max-width:480px">
+    <div class="modal-close" onclick="closeOv('suggestOv')">✕</div>
+    <div class="modal-title">Auto-suggest Purchase Order</div>
+    <div style="font-size:12px;color:var(--tan3);margin-bottom:12px">รายการสต็อกต่ำกว่า par min — เลือกรายการที่ต้องการสั่ง</div>
+    <div id="suggestList" style="background:var(--c3);border:1px solid var(--ln2);border-radius:10px;overflow:hidden;max-height:320px;overflow-y:auto;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn btn-ghost btn-sm" onclick="toggleAllSuggestions(true)">Select All</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleAllSuggestions(false)">Clear</button>
+      <span style="font-size:12px;color:var(--tan3);align-self:center;margin-left:4px">
+        <span id="suggestCount">0</span> selected
+      </span>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeOv('suggestOv')">Cancel</button>
+      <button class="btn btn-gold"  style="flex:2;justify-content:center" onclick="createFromSuggestions()">Create Draft PO</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT RECIPE -->
+<div class="overlay" id="recOv" onclick="if(event.target===this)closeOv('recOv')">
+  <div class="modal" style="position:relative;max-width:560px">
+    <div class="modal-close" onclick="closeOv('recOv')">✕</div>
+    <div class="modal-title" id="recOvTitle">Add Recipe</div>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-group span2">
+        <label class="form-lbl">Menu Item Name *</label>
+        <input type="text" class="inp" id="fr-name" placeholder="e.g. Thai Milk Tea">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Category</label>
+        <select class="inp" id="fr-cat">
+          <option>Tea</option><option>Coffee</option><option>Fruit Tea</option>
+          <option>Smoothie</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Selling Price (฿)</label>
+        <input type="number" class="inp" id="fr-price" placeholder="0" min="0" oninput="calcRecipeCost()">
+      </div>
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--tan3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+      <span>Ingredients</span>
+      <button class="btn btn-ghost btn-sm" onclick="addIngRow()">+ Add</button>
+    </div>
+    <div class="ing-editor" id="ingEditor"></div>
+
+    <!-- Live cost calculation -->
+    <div style="background:var(--c3);border:1px solid var(--ln2);border-radius:10px;padding:12px 14px;font-size:12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="color:var(--tan3)">Total COGS per cup</span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--red)" id="fr-cogs">฿0.00</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="color:var(--tan3)">Selling Price</span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--gl)" id="fr-price-show">฿0.00</span>
+      </div>
+      <div style="height:1px;background:var(--line);margin:8px 0"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--tan2);font-weight:600">Gross Margin</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:80px;height:5px;background:var(--c4);border-radius:3px;overflow:hidden">
+            <div id="fr-margin-bar" style="height:100%;border-radius:3px;background:var(--grn);width:0%;transition:width .3s"></div>
+          </div>
+          <span style="font-family:var(--mono);font-weight:700;font-size:14px" id="fr-margin">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeOv('recOv')">Cancel</button>
+      <button class="btn btn-gold"  style="flex:2;justify-content:center" onclick="saveRecipe()">Save Recipe</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT SUPPLIER -->
+<div class="overlay" id="supOv" onclick="if(event.target===this)closeOv('supOv')">
+  <div class="modal" style="position:relative;max-width:520px">
+    <div class="modal-close" onclick="closeOv('supOv')">✕</div>
+    <div class="modal-title" id="supOvTitle">Add Supplier</div>
+    <div class="form-grid">
+      <div class="form-group span2">
+        <label class="form-lbl">Supplier Name *</label>
+        <input type="text" class="inp" id="fs-name" placeholder="e.g. ชาไทย Trading Co.">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Phone</label>
+        <input type="tel" class="inp" id="fs-phone" placeholder="0812345678">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">LINE / WeChat</label>
+        <input type="text" class="inp" id="fs-line" placeholder="LINE ID">
+      </div>
+      <div class="form-group span2">
+        <label class="form-lbl">Email</label>
+        <input type="email" class="inp" id="fs-email" placeholder="supplier@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Category (สินค้าที่จัดหา)</label>
+        <select class="inp" id="fs-cat">
+          <option value="Tea">Tea</option>
+          <option value="Milk">Milk & Cream</option>
+          <option value="Syrup">Syrup & Flavoring</option>
+          <option value="Packaging">Packaging</option>
+          <option value="Topping">Topping</option>
+          <option value="Mixed">Mixed / Multiple</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Payment Terms</label>
+        <select class="inp" id="fs-terms">
+          <option value="COD">COD (เงินสด)</option>
+          <option value="Net7">Net 7</option>
+          <option value="Net15">Net 15</option>
+          <option value="Net30">Net 30</option>
+          <option value="Monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Lead Time (วัน)</label>
+        <input type="number" class="inp" id="fs-lead" placeholder="1" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Min Order (฿)</label>
+        <input type="number" class="inp" id="fs-moo" placeholder="0" min="0">
+      </div>
+      <div class="form-group span2">
+        <label class="form-lbl">Address / Note</label>
+        <textarea class="inp" id="fs-note" rows="2" placeholder="ที่อยู่ หรือหมายเหตุ"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Status</label>
+        <select class="inp" id="fs-status">
+          <option value="active">Active</option>
+          <option value="paused">Paused</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Tax ID (เลขผู้เสียภาษี)</label>
+        <input type="text" class="inp" id="fs-tax" placeholder="optional">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeOv('supOv')">Cancel</button>
+      <button class="btn btn-gold"  style="flex:2;justify-content:center" onclick="saveSupplier()">Save Supplier</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ═══════════════════ SCRIPTS ═══════════════════ -->
+<script>
+/* ══════════════════════════════════════════════════
+   STOCK S1 — Core Stock Management
+   ══════════════════════════════════════════════════ */
+
+/* ── SUPABASE (shared pattern from api.js) ──────── */
+const SB_URL  = window.ENV?.URL  || localStorage.getItem('sb_url')  || '';
+const SB_KEY  = window.ENV?.KEY  || localStorage.getItem('sb_key')  || '';
+const TIMEOUT = 12000;
+
+function sbFetch(url, opts = {}) {
+  const ctrl  = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+  return fetch(url, { ...opts, signal: ctrl.signal })
+    .finally(() => clearTimeout(timer));
+}
+
+const SB = {
+  h() {
+    return {
+      'apikey': SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    };
+  },
+  async q(table, p = {}) {
+    let url = `${SB_URL}/rest/v1/${table}?`;
+    if (p.select) url += `select=${encodeURIComponent(p.select)}&`;
+    if (p.eq)   Object.entries(p.eq).forEach(([k,v])  => url += `${k}=eq.${encodeURIComponent(v)}&`);
+    if (p.order) url += `order=${p.order}&`;
+    if (p.limit) url += `limit=${p.limit}&`;
+    const r = await sbFetch(url, { headers: this.h() });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async insert(table, data) {
+    const r = await sbFetch(`${SB_URL}/rest/v1/${table}`, {
+      method: 'POST', headers: this.h(), body: JSON.stringify(data),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async update(table, data, eq) {
+    let url = `${SB_URL}/rest/v1/${table}?`;
+    Object.entries(eq).forEach(([k,v]) => url += `${k}=eq.${encodeURIComponent(v)}&`);
+    const r = await sbFetch(url, { method: 'PATCH', headers: this.h(), body: JSON.stringify(data) });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async del(table, eq) {
+    let url = `${SB_URL}/rest/v1/${table}?`;
+    Object.entries(eq).forEach(([k,v]) => url += `${k}=eq.${encodeURIComponent(v)}&`);
+    const r = await sbFetch(url, { method: 'DELETE', headers: this.h() });
+    if (!r.ok) throw new Error(await r.text());
+    return true;
+  },
+};
+
+/* ── STATE ──────────────────────────────────────── */
+let ITEMS = [];           // stock_items
+let TX    = [];           // stock_transactions
+let EDIT_ID = null;
+let ADJ_TYPE = 'receive';
+let _sortKey = 'name';
+let _sortAsc = true;
+let _filterCat = 'all';
+let _filterStatus = 'all';
+let _filterTxType = 'all';
+let _search = '';
+
+const STAFF = JSON.parse(localStorage.getItem('ctb_staff') || '{}');
+const BRANCH = JSON.parse(localStorage.getItem('ctb_branch') || '{}');
+
+/* ── HELPERS ────────────────────────────────────── */
+function ge(id) { return document.getElementById(id); }
+function fmt(n) { return '฿' + Number(n||0).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtN(n, dp=2) { return Number(n||0).toLocaleString('en-US', {minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+function toast(msg, type = '', dur = 3000) {
+  const el = document.createElement('div');
+  el.className = 'toast-item' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  ge('toast').appendChild(el);
+  setTimeout(() => el.remove(), dur);
+}
+
+function closeOv(id) { ge(id).classList.remove('on'); }
+
+/* ── STOCK STATUS ───────────────────────────────── */
+function getStatus(item) {
+  const q = Number(item.current_qty || 0);
+  const mn = Number(item.par_min || 0);
+  if (q <= 0) return 'out';
+  if (mn > 0 && q <= mn) return 'low';
+  return 'ok';
+}
+
+function getLevelClass(item) {
+  const s = getStatus(item);
+  return { ok: 'lp-ok', low: 'lp-low', out: 'lp-out' }[s];
+}
+
+function getLevelLabel(item) {
+  const s = getStatus(item);
+  return { ok: 'In Stock', low: 'Low', out: 'Out' }[s];
+}
+
+function getBarPct(item) {
+  const q = Number(item.current_qty || 0);
+  const mx = Number(item.par_max || 0);
+  if (mx <= 0) return q > 0 ? 80 : 0;
+  return Math.min(100, Math.round((q / mx) * 100));
+}
+
+function getBarClass(item) {
+  const s = getStatus(item);
+  return { ok:'sbf-ok', low:'sbf-low', out:'sbf-out' }[s];
+}
+
+/* ── LOAD DATA ──────────────────────────────────── */
+async function loadData() {
+  // Try Supabase first, fall back to localStorage mock data
+  if (SB_URL && SB_KEY) {
+    try {
+      const [items, tx] = await Promise.all([
+        SB.q('stock_items', { select: '*', order: 'name' }),
+        SB.q('stock_transactions', { select: '*', order: 'created_at.desc', limit: 200 }),
+      ]);
+      ITEMS = items || [];
+      TX    = tx   || [];
+      ge('lastSync').textContent = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    } catch(e) {
+      console.warn('[stock] SB load failed:', e.message);
+      loadMock();
+    }
+  } else {
+    loadMock();
+  }
+  renderAll();
+}
+
+function loadMock() {
+  // Demo data so UI is usable without Supabase
+  ITEMS = [
+    { id:'1', name:'Taiwanese Green Tea',  cat:'Tea',       unit:'g',    current_qty:850,  par_min:200, par_max:2000, cost:0.28, sku:'TEA001', updated_at: new Date(Date.now()-3600000).toISOString() },
+    { id:'2', name:'Assam Black Tea',       cat:'Tea',       unit:'g',    current_qty:150,  par_min:200, par_max:1500, cost:0.22, sku:'TEA002', updated_at: new Date(Date.now()-7200000).toISOString() },
+    { id:'3', name:'Oat Milk',              cat:'Milk',      unit:'L',    current_qty:8.5,  par_min:10,  par_max:40,   cost:45,   sku:'MLK001', updated_at: new Date(Date.now()-900000).toISOString() },
+    { id:'4', name:'Fresh Whole Milk',      cat:'Milk',      unit:'L',    current_qty:22,   par_min:10,  par_max:50,   cost:28,   sku:'MLK002', updated_at: new Date(Date.now()-1800000).toISOString() },
+    { id:'5', name:'Brown Sugar Syrup',     cat:'Syrup',     unit:'ml',   current_qty:2400, par_min:500, par_max:5000, cost:0.08, sku:'SYR001', updated_at: new Date(Date.now()-600000).toISOString() },
+    { id:'6', name:'Lychee Syrup',          cat:'Syrup',     unit:'ml',   current_qty:380,  par_min:500, par_max:3000, cost:0.12, sku:'SYR002', updated_at: new Date(Date.now()-3600000).toISOString() },
+    { id:'7', name:'Tapioca Boba (cooked)', cat:'Topping',   unit:'g',    current_qty:0,    par_min:500, par_max:3000, cost:0.045,sku:'TOP001', updated_at: new Date(Date.now()-7200000).toISOString() },
+    { id:'8', name:'Grass Jelly',           cat:'Topping',   unit:'g',    current_qty:1200, par_min:300, par_max:2000, cost:0.035,sku:'TOP002', updated_at: new Date(Date.now()-3600000).toISOString() },
+    { id:'9', name:'Hot Cup 16oz',          cat:'Packaging', unit:'pcs',  current_qty:340,  par_min:200, par_max:1000, cost:2.5,  sku:'PKG001', updated_at: new Date(Date.now()-86400000).toISOString() },
+    { id:'10',name:'Cold Cup 22oz',         cat:'Packaging', unit:'pcs',  current_qty:180,  par_min:200, par_max:1000, cost:3.2,  sku:'PKG002', updated_at: new Date(Date.now()-86400000).toISOString() },
+  ];
+  TX = [
+    { id:'t1', item_id:'1', item_name:'Taiwanese Green Tea', type:'receive', qty:500,  note:'Morning receive', staff_name:'Manager', created_at: new Date(Date.now()-7200000).toISOString() },
+    { id:'t2', item_id:'3', item_name:'Oat Milk',            type:'issue',   qty:-12,  note:'Daily use',       staff_name:'Staff A', created_at: new Date(Date.now()-5400000).toISOString() },
+    { id:'t3', item_id:'7', item_name:'Tapioca Boba',        type:'waste',   qty:-200, note:'Expired',         staff_name:'Staff B', created_at: new Date(Date.now()-3600000).toISOString() },
+    { id:'t4', item_id:'5', item_name:'Brown Sugar Syrup',   type:'receive', qty:1000, note:'Supplier delivery',staff_name:'Manager', created_at: new Date(Date.now()-1800000).toISOString() },
+  ];
+}
+
+/* ── RENDER ALL ─────────────────────────────────── */
+function renderAll() {
+  renderStatusBar();
+  renderCatList();
+  renderItems();
+  renderTx();
+  renderReport();
+  renderLowBanner();
+  populateAdjSelect();
+  ge('hdrBranch').textContent = BRANCH.name || 'Main Branch';
+  ge('nbItems').textContent = ITEMS.length;
+}
+
+/* ── STATUS BAR ─────────────────────────────────── */
+function renderStatusBar() {
+  const ok  = ITEMS.filter(i => getStatus(i) === 'ok').length;
+  const low = ITEMS.filter(i => getStatus(i) === 'low').length;
+  const out = ITEMS.filter(i => getStatus(i) === 'out').length;
+  ge('statOk').textContent  = ok;
+  ge('statLow').textContent = low;
+  ge('statOut').textContent = out;
+}
+
+/* ── LOW STOCK BANNER ────────────────────────────── */
+function renderLowBanner() {
+  const lowItems = ITEMS.filter(i => getStatus(i) === 'low' || getStatus(i) === 'out');
+  const banner = ge('lowBanner');
+  if (!lowItems.length) { banner.classList.remove('on'); return; }
+  banner.classList.add('on');
+  const names = lowItems.slice(0, 3).map(i => i.name).join(', ');
+  ge('lowBannerTxt').textContent = `${lowItems.length} รายการสต็อกต่ำ:`;
+  ge('lowBannerItems').textContent = names + (lowItems.length > 3 ? ` +${lowItems.length-3} more` : '');
+}
+
+/* ── CATEGORY LIST ───────────────────────────────── */
+function renderCatList() {
+  const cats = [...new Set(ITEMS.map(i => i.cat))].sort();
+  const catList = ge('catList');
+  // Keep "All" button
+  const allBtn = catList.querySelector('#cat-all');
+  catList.innerHTML = '';
+  catList.appendChild(allBtn);
+  cats.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'nav-item' + (_filterCat === c ? ' on' : '');
+    div.innerHTML = `<svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>${c}`;
+    div.onclick = () => filterCat(c, div);
+    catList.appendChild(div);
+  });
+}
+
+/* ── ITEM TABLE ─────────────────────────────────── */
+function filteredItems() {
+  return ITEMS.filter(item => {
+    const matchCat    = _filterCat === 'all' || item.cat === _filterCat;
+    const matchStatus = _filterStatus === 'all' || getStatus(item) === _filterStatus;
+    const q = _search.toLowerCase();
+    const matchSearch = !q || item.name.toLowerCase().includes(q) || (item.sku||'').toLowerCase().includes(q) || (item.cat||'').toLowerCase().includes(q);
+    return matchCat && matchStatus && matchSearch;
+  }).sort((a,b) => {
+    let va = a[_sortKey] ?? '', vb = b[_sortKey] ?? '';
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    return _sortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+}
+
+function renderItems() {
+  const list = filteredItems();
+  const tbody = ge('itemsTbody');
+  const empty = ge('itemsEmpty');
+  if (!list.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'flex';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = list.map(item => {
+    const status = getStatus(item);
+    const pct    = getBarPct(item);
+    const lc     = getLevelClass(item);
+    const bc     = getBarClass(item);
+    return `<tr>
+      <td>
+        <div style="font-weight:600;color:var(--tan)">${item.name}</div>
+        <div style="font-size:11px;color:var(--tan4);margin-top:1px">${item.sku||'—'}</div>
+      </td>
+      <td><span style="font-size:11px;background:var(--c3);border:1px solid var(--ln2);border-radius:5px;padding:2px 7px;color:var(--tan3)">${item.cat||'—'}</span></td>
+      <td>
+        <div class="qty-cell">
+          <span class="qty-val">${fmtN(item.current_qty,1)}</span>
+          <span class="qty-unit">${item.unit}</span>
+          <div class="stock-bar"><div class="stock-bar-fill ${bc}" style="width:${pct}%"></div></div>
+        </div>
+      </td>
+      <td><span class="level-pill ${lc}"><span class="lp-dot"></span>${getLevelLabel(item)}</span></td>
+      <td style="font-family:var(--mono);font-size:12px">${fmt(item.cost)}</td>
+      <td style="font-size:12px;color:var(--tan3)">${fmtN(item.par_min,0)} / ${fmtN(item.par_max,0)} ${item.unit}</td>
+      <td style="font-size:11px;color:var(--tan4)">${timeAgo(item.updated_at)}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="openAdjModal('receive','${item.id}')" title="Receive">↓</button>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="editItem('${item.id}')" title="Edit">✎</button>
+          <button class="btn btn-red btn-sm btn-icon" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── TRANSACTIONS ───────────────────────────────── */
+function filteredTx() {
+  return TX.filter(t => _filterTxType === 'all' || t.type === _filterTxType);
+}
+
+const TX_ICONS = {
+  receive: { icon:'↓', cls:'tx-in' },
+  issue:   { icon:'↑', cls:'tx-out' },
+  adjust:  { icon:'↔', cls:'tx-adj' },
+  waste:   { icon:'✕', cls:'tx-wst' },
+};
+const TX_TYPE_LABELS = { receive:'Receive', issue:'Issue', adjust:'Adjust', waste:'Waste' };
+const TX_TYPE_COLORS = {
+  receive:'var(--grn)',
+  issue:'var(--red)',
+  adjust:'var(--blu)',
+  waste:'var(--ora)',
+};
+
+function renderTx() {
+  const list = filteredTx();
+  const el = ge('txRows');
+  const empty = ge('txEmpty');
+  if (!list.length) { el.innerHTML=''; empty.style.display='flex'; return; }
+  empty.style.display = 'none';
+  el.innerHTML = list.map(t => {
+    const ic = TX_ICONS[t.type] || TX_ICONS.adjust;
+    const qtyNum = Number(t.qty || 0);
+    const qtyDisp = (qtyNum > 0 ? '+' : '') + fmtN(Math.abs(qtyNum),1);
+    const isPos = ['receive'].includes(t.type);
+    return `<div class="tx-view-row">
+      <div class="tx-icon ${ic.cls}" style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${ic.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;color:var(--tan)">${t.item_name||'Unknown'}</div>
+        <div style="font-size:11px;color:var(--tan3);margin-top:1px">${t.note||'—'} · ${t.staff_name||'—'}</div>
+      </div>
+      <div>
+        <span class="tv-type" style="background:${TX_TYPE_COLORS[t.type]}18;color:${TX_TYPE_COLORS[t.type]};border:1px solid ${TX_TYPE_COLORS[t.type]}30">${TX_TYPE_LABELS[t.type]||t.type}</span>
+      </div>
+      <div style="font-family:var(--mono);font-weight:700;font-size:13px;color:${isPos?'var(--grn)':'var(--red)'};min-width:60px;text-align:right">${isPos?'+':''}${fmtN(Math.abs(qtyNum),1)}</div>
+      <div style="font-size:11px;color:var(--tan4);min-width:80px;text-align:right">${timeAgo(t.created_at)}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── REPORT ─────────────────────────────────────── */
+function renderReport() {
+  const totalVal = ITEMS.reduce((s,i) => s + Number(i.current_qty||0) * Number(i.cost||0), 0);
+  const low = ITEMS.filter(i => getStatus(i)==='low').length;
+  const out = ITEMS.filter(i => getStatus(i)==='out').length;
+  ge('rptSkus').textContent  = ITEMS.length;
+  ge('rptValue').textContent = fmt(totalVal);
+  ge('rptLow').textContent   = low;
+  ge('rptOut').textContent   = out;
+
+  const sorted = [...ITEMS].sort((a,b) => {
+    const va = Number(a.current_qty||0)*Number(a.cost||0);
+    const vb = Number(b.current_qty||0)*Number(b.cost||0);
+    return vb - va;
+  });
+  ge('rptTbody').innerHTML = sorted.map(item => {
+    const val = Number(item.current_qty||0) * Number(item.cost||0);
+    const pct = totalVal > 0 ? ((val/totalVal)*100).toFixed(1) : 0;
+    const lc  = getLevelClass(item);
+    return `<tr>
+      <td style="font-weight:600;color:var(--tan)">${item.name}</td>
+      <td style="font-size:12px;color:var(--tan3)">${item.cat||'—'}</td>
+      <td style="font-family:var(--mono)">${fmtN(item.current_qty,1)} ${item.unit}</td>
+      <td style="font-family:var(--mono)">${fmt(item.cost)}/${item.unit}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--gl)">${fmt(val)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:60px;height:4px;background:var(--c4);border-radius:2px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:var(--gl);border-radius:2px"></div>
+          </div>
+          <span style="font-size:11px;color:var(--tan3)">${pct}%</span>
+        </div>
+      </td>
+      <td><span class="level-pill ${lc}"><span class="lp-dot"></span>${getLevelLabel(item)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── FILTER / SORT ──────────────────────────────── */
+function filterCat(cat, el) {
+  _filterCat = cat;
+  document.querySelectorAll('#catList .nav-item').forEach(e => e.classList.remove('on'));
+  el.classList.add('on');
+  renderItems();
+}
+function filterStatus(s, el) {
+  _filterStatus = s;
+  document.querySelectorAll('.filter-tabs .ftab').forEach(e => e.classList.remove('on'));
+  el.classList.add('on');
+  renderItems();
+}
+function filterLow() {
+  _filterStatus = 'low';
+  document.querySelectorAll('#vItems .filter-tabs .ftab').forEach(e => e.classList.remove('on'));
+  showView('vItems', document.querySelector('.nav-item'));
+  renderItems();
+}
+function filterTxType(t, el) {
+  _filterTxType = t;
+  document.querySelectorAll('#vTx .filter-tabs .ftab').forEach(e => e.classList.remove('on'));
+  el.classList.add('on');
+  renderTx();
+}
+function filterItems() {
+  _search = ge('itemSearch').value;
+  renderItems();
+}
+function sortBy(key) {
+  if (_sortKey === key) _sortAsc = !_sortAsc;
+  else { _sortKey = key; _sortAsc = true; }
+  renderItems();
+}
+function showView(id, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('on'));
+  ge(id).classList.add('on');
+  if (el) el.classList.add('on');
+  if (id === 'vReport') renderReport();
+  if (id === 'vTx')     renderTx();
+}
+
+/* ── ADD / EDIT ITEM ────────────────────────────── */
+function openAddItem() {
+  EDIT_ID = null;
+  ge('itemOvTitle').textContent = 'Add Stock Item';
+  ['fi-name','fi-qty','fi-cost','fi-pmin','fi-pmax','fi-sku','fi-note'].forEach(id => ge(id).value='');
+  ge('fi-cat').value  = 'Tea';
+  ge('fi-unit').value = 'g';
+  ge('itemOv').classList.add('on');
+}
+
+function editItem(id) {
+  const item = ITEMS.find(i => i.id === id);
+  if (!item) return;
+  EDIT_ID = id;
+  ge('itemOvTitle').textContent = 'Edit: ' + item.name;
+  ge('fi-name').value = item.name   || '';
+  ge('fi-cat').value  = item.cat    || 'Tea';
+  ge('fi-unit').value = item.unit   || 'g';
+  ge('fi-qty').value  = item.current_qty ?? '';
+  ge('fi-cost').value = item.cost   ?? '';
+  ge('fi-pmin').value = item.par_min ?? '';
+  ge('fi-pmax').value = item.par_max ?? '';
+  ge('fi-sku').value  = item.sku    || '';
+  ge('fi-note').value = item.note   || '';
+  ge('itemOv').classList.add('on');
+}
+
+async function saveItem() {
+  const name = ge('fi-name').value.trim();
+  if (!name) { toast('กรุณากรอกชื่อ item', 'warn'); return; }
+  const data = {
+    name,
+    cat:         ge('fi-cat').value,
+    unit:        ge('fi-unit').value,
+    current_qty: Number(ge('fi-qty').value) || 0,
+    cost:        Number(ge('fi-cost').value) || 0,
+    par_min:     Number(ge('fi-pmin').value) || 0,
+    par_max:     Number(ge('fi-pmax').value) || 0,
+    sku:         ge('fi-sku').value.trim() || null,
+    note:        ge('fi-note').value.trim() || null,
+    updated_at:  new Date().toISOString(),
+    branch_id:   BRANCH.id || null,
+  };
+  if (EDIT_ID) {
+    // Update
+    if (SB_URL) { try { await SB.update('stock_items', data, { id: EDIT_ID }); } catch(e) { toast('Save error: '+e.message,'error'); return; } }
+    const idx = ITEMS.findIndex(i => i.id === EDIT_ID);
+    if (idx >= 0) ITEMS[idx] = { ...ITEMS[idx], ...data };
+    toast(name + ' updated', 'success');
+  } else {
+    // Insert
+    data.id = SB_URL ? undefined : ('local_' + Date.now());
+    if (SB_URL) {
+      try {
+        const res = await SB.insert('stock_items', data);
+        data.id = res[0]?.id || data.id;
+      } catch(e) { toast('Save error: '+e.message,'error'); return; }
+    }
+    ITEMS.push({ ...data, id: data.id || ('local_' + Date.now()) });
+    toast(name + ' added', 'success');
+  }
+  closeOv('itemOv');
+  renderAll();
+}
+
+async function deleteItem(id) {
+  const item = ITEMS.find(i => i.id === id);
+  if (!item || !confirm(`Delete "${item.name}"?`)) return;
+  if (SB_URL) { try { await SB.del('stock_items', { id }); } catch(e) { toast('Delete error: '+e.message,'error'); return; } }
+  ITEMS = ITEMS.filter(i => i.id !== id);
+  renderAll();
+  toast(item.name + ' deleted');
+}
+
+/* ── ADJUST MODAL ───────────────────────────────── */
+function populateAdjSelect() {
+  const sel = ge('adj-item');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select item...</option>' +
+    [...ITEMS].sort((a,b)=>a.name.localeCompare(b.name))
+      .map(i => `<option value="${i.id}">${i.name} (${fmtN(i.current_qty,1)} ${i.unit})</option>`).join('');
+  if (cur) sel.value = cur;
+  sel.onchange = () => {
+    const item = ITEMS.find(i => i.id === sel.value);
+    if (!item) { ge('adj-preview').style.display='none'; return; }
+    if (ge('fi-cost')) ge('adj-cost').value = item.cost || '';
+    updateAdjPreview();
+  };
+  ge('adj-qty').oninput = updateAdjPreview;
+}
+
+function updateAdjPreview() {
+  const item = ITEMS.find(i => i.id === ge('adj-item').value);
+  const qty  = Number(ge('adj-qty').value) || 0;
+  if (!item || !qty) { ge('adj-preview').style.display='none'; return; }
+  const cur = Number(item.current_qty || 0);
+  let after = cur;
+  if (ADJ_TYPE === 'receive') after = cur + qty;
+  else if (ADJ_TYPE === 'issue' || ADJ_TYPE === 'waste') after = Math.max(0, cur - qty);
+  else if (ADJ_TYPE === 'adjust') after = qty; // set absolute
+  ge('adj-cur').textContent   = fmtN(cur,1) + ' ' + item.unit;
+  ge('adj-after').textContent = fmtN(after,1) + ' ' + item.unit;
+  ge('adj-preview').style.display = 'block';
+}
+
+function openAdjModal(type, itemId) {
+  setAdjType(type || 'receive');
+  ge('adj-qty').value   = '';
+  ge('adj-cost').value  = '';
+  ge('adj-note').value  = '';
+  ge('adj-preview').style.display = 'none';
+  if (itemId) {
+    ge('adj-item').value = itemId;
+    const item = ITEMS.find(i => i.id === itemId);
+    if (item) ge('adj-cost').value = item.cost || '';
+  } else {
+    ge('adj-item').value = '';
+  }
+  ge('adjOv').classList.add('on');
+}
+
+function setAdjType(type) {
+  ADJ_TYPE = type;
+  ['receive','issue','adjust','waste'].forEach(t => {
+    ge('adj-'+t).classList.toggle('on', t === type);
+  });
+  // Show/hide cost field (only relevant for receive)
+  ge('adj-cost-wrap').style.display = type === 'receive' ? 'flex' : 'none';
+  // Label change for adjust
+  if (type === 'adjust') {
+    ge('adj-qty').placeholder = 'New absolute quantity';
+  } else {
+    ge('adj-qty').placeholder = '0';
+  }
+  updateAdjPreview();
+}
+
+async function saveAdj() {
+  const itemId = ge('adj-item').value;
+  const qty    = Number(ge('adj-qty').value);
+  const note   = ge('adj-note').value.trim();
+  if (!itemId) { toast('กรุณาเลือก item', 'warn'); return; }
+  if (!qty || qty <= 0) { toast('กรุณากรอกจำนวน', 'warn'); return; }
+
+  const item = ITEMS.find(i => i.id === itemId);
+  if (!item) return;
+
+  const cur = Number(item.current_qty || 0);
+  let newQty = cur;
+  let txQty  = qty;
+
+  if (ADJ_TYPE === 'receive') { newQty = cur + qty; }
+  else if (ADJ_TYPE === 'issue')  { newQty = Math.max(0, cur - qty); txQty = -qty; }
+  else if (ADJ_TYPE === 'waste')  { newQty = Math.max(0, cur - qty); txQty = -qty; }
+  else if (ADJ_TYPE === 'adjust') { txQty = qty - cur; newQty = qty; }
+
+  const now = new Date().toISOString();
+
+  // Update stock item
+  const itemUpdate = { current_qty: newQty, updated_at: now };
+  if (ADJ_TYPE === 'receive') {
+    const cost = Number(ge('adj-cost').value);
+    if (cost > 0) itemUpdate.cost = cost;
+  }
+
+  if (SB_URL) {
+    try {
+      await SB.update('stock_items', itemUpdate, { id: itemId });
+    } catch(e) { toast('Update failed: '+e.message,'error'); return; }
+  }
+
+  // Log transaction
+  const tx = {
+    id:         'local_' + Date.now(),
+    item_id:    itemId,
+    item_name:  item.name,
+    type:       ADJ_TYPE,
+    qty:        txQty,
+    note:       note || null,
+    staff_name: STAFF.name || 'Staff',
+    created_at: now,
+  };
+  if (SB_URL) {
+    try {
+      const res = await SB.insert('stock_transactions', {
+        item_id: itemId, type: ADJ_TYPE, qty: txQty,
+        note: tx.note, staff_name: tx.staff_name, branch_id: BRANCH.id||null, created_at: now,
+      });
+      tx.id = res[0]?.id || tx.id;
+    } catch(e) { console.warn('[tx]', e.message); }
+  }
+
+  // Update local state
+  const idx = ITEMS.findIndex(i => i.id === itemId);
+  if (idx >= 0) Object.assign(ITEMS[idx], itemUpdate);
+  TX.unshift(tx);
+
+  closeOv('adjOv');
+  const labels = { receive:'received', issue:'issued', adjust:'adjusted', waste:'written off' };
+  toast(`${item.name}: ${labels[ADJ_TYPE]} ${fmtN(Math.abs(txQty),1)} ${item.unit}`, 'success');
+  renderAll();
+}
+
+/* ── EXPORT CSV ─────────────────────────────────── */
+function exportCSV() {
+  const rows = [['Name','Category','Unit','Qty','Cost','Total Value','Par Min','Par Max','Status','SKU','Updated']];
+  ITEMS.forEach(i => {
+    rows.push([
+      i.name, i.cat, i.unit,
+      i.current_qty, i.cost,
+      (Number(i.current_qty||0)*Number(i.cost||0)).toFixed(2),
+      i.par_min, i.par_max, getStatus(i), i.sku||'', i.updated_at||'',
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\ufeff' + csv);
+  a.download = `stock_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('Exported stock.csv', 'success');
+}
+
+/* ══════════════════════════════════════════════════
+   S5b — WASTE REPORT + REORDER REPORT
+   ══════════════════════════════════════════════════ */
+
+let _reorderFilter = 'all';
+
+/* ══ WASTE REPORT ══════════════════════════════════ */
+
+function getWastePeriodMs() {
+  return Number(ge('wastePeriod')?.value || 30) * 86400000;
+}
+
+function renderWaste() {
+  const cutoff  = Date.now() - getWastePeriodMs();
+  const wEvents = TX.filter(t => t.type === 'waste' && new Date(t.created_at) > new Date(cutoff));
+
+  // Aggregate by item
+  const byItem = {};
+  wEvents.forEach(t => {
+    const id = t.item_id;
+    if (!byItem[id]) byItem[id] = { name: t.item_name, qty: 0, cost: 0, events: 0, last: null };
+    const qty = Math.abs(Number(t.qty || 0));
+    const item = ITEMS.find(i => i.id === id);
+    byItem[id].qty    += qty;
+    byItem[id].cost   += qty * Number(item?.cost || 0);
+    byItem[id].events += 1;
+    if (!byItem[id].last || t.created_at > byItem[id].last) byItem[id].last = t.created_at;
+  });
+
+  const rows    = Object.entries(byItem).sort((a,b) => b[1].cost - a[1].cost);
+  const totalCost = rows.reduce((s,[,v]) => s + v.cost, 0);
+  const totalVal  = ITEMS.reduce((s,i) => s + Number(i.current_qty||0)*Number(i.cost||0), 0);
+  const pct       = totalVal > 0 ? (totalCost/totalVal*100) : 0;
+
+  // KPIs
+  ge('w-count').textContent = wEvents.length;
+  ge('w-cost').textContent  = '฿' + totalCost.toFixed(2);
+  ge('w-top').textContent   = rows[0]?.[1]?.name || '—';
+  ge('w-pct').textContent   = pct.toFixed(1) + '%';
+
+  const tbody = ge('wasteTbody');
+  const empty = ge('wasteEmpty');
+  if (!rows.length) { tbody.innerHTML=''; empty.style.display='flex'; return; }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = rows.map(([id, v]) => {
+    const item   = ITEMS.find(i => i.id === id);
+    const pctRow = totalCost > 0 ? (v.cost/totalCost*100) : 0;
+    return `<tr>
+      <td style="font-weight:600;color:var(--tan)">${v.name}</td>
+      <td><span style="font-size:11px;background:var(--c3);border:1px solid var(--ln2);border-radius:5px;padding:2px 7px;color:var(--tan3)">${item?.cat||'—'}</span></td>
+      <td style="font-family:var(--mono);color:var(--red);font-weight:700">${fmtN(v.qty,1)} <span style="color:var(--tan4);font-weight:400;font-size:11px">${item?.unit||''}</span></td>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--red)">฿${v.cost.toFixed(2)}</td>
+      <td>
+        <div class="waste-bar-wrap">
+          <div class="waste-bar"><div class="waste-bar-fill" style="width:${pctRow}%"></div></div>
+          <span style="font-size:11px;color:var(--tan3);min-width:32px">${pctRow.toFixed(0)}%</span>
+        </div>
+      </td>
+      <td style="font-size:11px;color:var(--tan4)">${timeAgo(v.last)}</td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--tan3)">${v.events}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportWasteCSV() {
+  const cutoff  = Date.now() - getWastePeriodMs();
+  const wEvents = TX.filter(t => t.type==='waste' && new Date(t.created_at)>new Date(cutoff));
+  const rows = [['Date','Item','Qty','Unit','Cost','Note','Staff']];
+  wEvents.forEach(t => {
+    const item = ITEMS.find(i=>i.id===t.item_id);
+    const qty  = Math.abs(Number(t.qty||0));
+    rows.push([t.created_at, t.item_name||'—', qty, item?.unit||'', (qty*Number(item?.cost||0)).toFixed(2), t.note||'', t.staff_name||'—']);
+  });
+  const csv = rows.map(r => r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\ufeff'+csv);
+  a.download = `waste_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('Exported waste report', 'success');
+}
+
+/* ══ REORDER REPORT ════════════════════════════════ */
+
+function filterReorder(f, el) {
+  _reorderFilter = f;
+  document.querySelectorAll('#vReorder .filter-tabs .ftab').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  renderReorder();
+}
+
+function renderReorder() {
+  const needReorder = ITEMS.filter(i => getStatus(i) !== 'ok');
+  const filtered    = needReorder.filter(i => {
+    if (_reorderFilter === 'urgent') return getStatus(i) === 'out';
+    if (_reorderFilter === 'low')    return getStatus(i) === 'low';
+    return true;
+  });
+
+  // KPIs
+  const estCost = needReorder.reduce((s,i) => {
+    const toOrder = Math.max(0, Number(i.par_max||0) - Number(i.current_qty||0));
+    return s + toOrder * Number(i.cost||0);
+  }, 0);
+  const supIds = new Set(needReorder.map(i=>i.preferred_supplier_id).filter(Boolean));
+
+  ge('ro-count').textContent = needReorder.length;
+  ge('ro-cost').textContent  = '฿' + estCost.toLocaleString('en-US',{maximumFractionDigits:0});
+  ge('ro-sups').textContent  = supIds.size || '—';
+  ge('nbReorder').textContent= needReorder.length;
+
+  const grid  = ge('reorderGrid');
+  const empty = ge('reorderEmpty');
+  if (!filtered.length) { grid.innerHTML=''; empty.style.display='flex'; return; }
+  empty.style.display = 'none';
+
+  grid.innerHTML = filtered
+    .sort((a,b) => (getStatus(a)==='out'?0:1) - (getStatus(b)==='out'?0:1))
+    .map(item => {
+      const st      = getStatus(item);
+      const cardCls = st === 'out' ? 'urgent' : 'low';
+      const icoCls  = cardCls;
+      const icoEmoji= st === 'out' ? '🔴' : '🟡';
+      const toOrder = Math.max(0, Number(item.par_max||0) - Number(item.current_qty||0));
+      const estItemCost = toOrder * Number(item.cost||0);
+      const sup     = SUPPLIERS.find(s=>s.id===item.preferred_supplier_id);
+      const leadDays= sup?.lead_time || '—';
+      const pctBar  = item.par_max ? Math.min(100,(Number(item.current_qty||0)/Number(item.par_max))*100) : 0;
+
+      return `<div class="reorder-card ${cardCls}">
+        <div class="ro-icon ${icoCls}">${icoEmoji}</div>
+        <div class="ro-body">
+          <div class="ro-name">${item.name}</div>
+          <div class="ro-meta">
+            Current: <strong>${fmtN(item.current_qty,1)} ${item.unit}</strong> ·
+            Par Min: ${fmtN(item.par_min,0)} · Par Max: ${fmtN(item.par_max,0)}<br>
+            ${sup ? `Supplier: <strong>${sup.name}</strong> · Lead: ${leadDays}d<br>` : ''}
+            Est. order: <strong>${fmtN(toOrder,0)} ${item.unit}</strong> = <strong style="color:var(--gl)">฿${estItemCost.toFixed(0)}</strong>
+          </div>
+          <!-- Stock bar -->
+          <div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+            <div style="flex:1;height:4px;background:var(--c4);border-radius:2px;overflow:hidden">
+              <div style="height:100%;border-radius:2px;background:${st==='out'?'var(--red)':'var(--ora)'};width:${pctBar}%"></div>
+            </div>
+            <span style="font-size:10px;color:var(--tan4)">${Math.round(pctBar)}% of max</span>
+          </div>
+          <div class="ro-action">
+            <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="openAdjModal('receive','${item.id}')">Quick Receive</button>
+            <button class="btn btn-gold btn-sm"  style="flex:1;justify-content:center" onclick="createSinglePO('${item.id}')">Create PO</button>
+          </div>
+        </div>
+        <div class="ro-qty ${cardCls}">${fmtN(item.current_qty,1)}<br><span style="font-size:10px;font-weight:400;color:var(--tan4)">${item.unit}</span></div>
+      </div>`;
+    }).join('');
+}
+
+function createSinglePO(itemId) {
+  const item = ITEMS.find(i=>i.id===itemId);
+  if (!item) return;
+  const toOrder = Math.max(0, Number(item.par_max||0) - Number(item.current_qty||0));
+  _poLines = [{ id:'pl_0', stock_item_id:itemId, qty:fmtN(toOrder,1), unit_cost:item.cost||'' }];
+  EDIT_PO_ID = null;
+  ge('poOvTitle').textContent = 'New PO — ' + item.name;
+  ge('po-supplier').innerHTML = '<option value="">-- Select supplier --</option>'+
+    SUPPLIERS.filter(s=>s.status==='active').map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  ge('po-supplier').value = item.preferred_supplier_id || '';
+  ge('po-date').value=''; ge('po-note').value='Auto from Reorder Report';
+  renderPOLines();
+  ge('poOv').classList.add('on');
+}
+
+function createPOFromReorder() {
+  const items = ITEMS.filter(i=>getStatus(i)!=='ok');
+  if (!items.length) { toast('ไม่มีสินค้าที่ต้องสั่ง','info'); return; }
+  _poLines = items.map((item,i) => {
+    const toOrder = Math.max(0, Number(item.par_max||0) - Number(item.current_qty||0));
+    return { id:'pl_'+i, stock_item_id:item.id, qty:fmtN(toOrder,1), unit_cost:item.cost||'' };
+  });
+  EDIT_PO_ID = null;
+  ge('poOvTitle').textContent = 'New PO — Reorder All';
+  ge('po-supplier').innerHTML = '<option value="">-- Select supplier --</option>'+
+    SUPPLIERS.filter(s=>s.status==='active').map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  ge('po-supplier').value=''; ge('po-date').value=''; ge('po-note').value='Auto: Reorder Report';
+  renderPOLines();
+  ge('poOv').classList.add('on');
+}
+
+/* ── PATCH showView + loadData ──────────────────── */
+const _origShowViewS5b = showView;
+showView = function(id, el) {
+  _origShowViewS5b(id, el);
+  if (id==='vWaste')   renderWaste();
+  if (id==='vReorder') renderReorder();
+};
+
+const _origLoadDataS5b = loadData;
+loadData = async function() {
+  await _origLoadDataS5b();
+  // Update reorder badge after load
+  setTimeout(() => {
+    const n = ITEMS.filter(i=>getStatus(i)!=='ok').length;
+    ge('nbReorder').textContent = n;
+  }, 500);
+};
+
+/* ══════════════════════════════════════════════════
+   S5a — CYCLE COUNT
+   ══════════════════════════════════════════════════ */
+let CC_SESSION = null;
+// CC_SESSION = { phase:'active'|'review'|'posted', startedAt, counts:{itemId→qty}, postedAt }
+const CC_KEY = 'stock_cycle_count';
+
+function loadCCSession() {
+  try { CC_SESSION = JSON.parse(localStorage.getItem(CC_KEY)); } catch(e) { CC_SESSION = null; }
+}
+function saveCCSession() {
+  try { localStorage.setItem(CC_KEY, JSON.stringify(CC_SESSION)); } catch(e) {}
+}
+function clearCCSession() { CC_SESSION = null; localStorage.removeItem(CC_KEY); }
+
+/* ── POPULATE CATEGORY FILTER ───────────────────── */
+function populateCCCatFilter() {
+  const sel = ge('ccCatFilter');
+  if (!sel) return;
+  const cats = [...new Set(ITEMS.map(i => i.cat))].sort();
+  sel.innerHTML = '<option value="all">All Categories</option>' +
+    cats.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+/* ── START COUNT ─────────────────────────────────── */
+function startCycleCount() {
+  if (CC_SESSION?.phase === 'active') { renderCycleCount(); return; }
+  CC_SESSION = { phase: 'active', startedAt: new Date().toISOString(), counts: {}, postedAt: null };
+  saveCCSession();
+  updateCCControls();
+  renderCycleCount();
+  toast('Count started — กรอกจำนวนที่นับได้จริง', 'info');
+}
+
+/* ── CONTROLS STATE ─────────────────────────────── */
+function updateCCControls() {
+  const phase    = CC_SESSION?.phase;
+  const hasCount = CC_SESSION && Object.keys(CC_SESSION.counts).length > 0;
+  ge('ccStartBtn').style.display   = phase ? 'none' : 'flex';
+  ge('ccReviewBtn').style.display  = phase === 'active' && hasCount ? 'flex' : 'none';
+  ge('ccPostBtn').style.display    = phase === 'review' ? 'flex' : 'none';
+  ge('ccDiscardBtn').style.display = phase ? 'flex' : 'none';
+  ge('ccColHdr').style.display     = phase ? 'block' : 'none';
+  ge('ccProgressWrap').style.display = phase === 'active' ? 'block' : 'none';
+  ge('nbCount').style.display      = phase === 'active' ? 'inline-flex' : 'none';
+
+  const phaseLbls = { active:'🔄 Count in progress', review:'🔍 Review variances', posted:'✓ Posted' };
+  ge('ccStatusLbl').textContent = phase ? (phaseLbls[phase] || phase) : 'No active count';
+
+  // Progress
+  if (phase === 'active') {
+    const total   = ITEMS.length;
+    const counted = Object.keys(CC_SESSION.counts).length;
+    const pct     = total ? Math.round((counted/total)*100) : 0;
+    ge('ccProgress').textContent = `${counted}/${total} items (${pct}%)`;
+    ge('ccProgressBar').style.width = pct + '%';
+  } else {
+    ge('ccProgress').textContent = '';
+  }
+}
+
+/* ── RENDER COUNT LIST ───────────────────────────── */
+function renderCycleCount() {
+  const el    = ge('ccList');
+  const empty = ge('ccEmpty');
+  if (!CC_SESSION) { el.innerHTML=''; empty.style.display='flex'; updateCCControls(); return; }
+  empty.style.display = 'none';
+
+  const catFilter = ge('ccCatFilter')?.value || 'all';
+  const cats = catFilter === 'all'
+    ? [...new Set(ITEMS.map(i=>i.cat))].sort()
+    : [catFilter];
+
+  el.innerHTML = cats.map(cat => {
+    const catItems = ITEMS.filter(i => i.cat === cat);
+    const catCounted = catItems.filter(i => CC_SESSION.counts[i.id] !== undefined).length;
+
+    const rows = catItems.map(item => {
+      const sysQty    = Number(item.current_qty || 0);
+      const counted   = CC_SESSION.counts[item.id];
+      const hasCounted= counted !== undefined;
+      const countQty  = hasCounted ? Number(counted) : null;
+      const variance  = hasCounted ? (countQty - sysQty) : null;
+
+      let varCls = '', varStr = '—';
+      if (variance !== null) {
+        const abs = Math.abs(variance);
+        varCls = abs < 0.01 ? 'cc-var-ok' : abs <= 5 ? 'cc-var-warn' : 'cc-var-bad';
+        varStr = (variance >= 0 ? '+' : '') + fmtN(variance, 1);
+      }
+
+      const isReview = CC_SESSION.phase === 'review';
+
+      return `<div class="cc-row" id="ccrow_${item.id}">
+        <div>
+          <div style="font-weight:600;color:var(--tan)">${item.name}</div>
+          <div style="font-size:10px;color:var(--tan4);margin-top:1px">${item.unit} · SKU: ${item.sku||'—'}</div>
+        </div>
+        <div style="font-family:var(--mono);text-align:right;color:var(--tan3)">${fmtN(sysQty,1)}</div>
+        <div>
+          ${isReview
+            ? `<div style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--tan)">${hasCounted ? fmtN(countQty,1) : '—'}</div>`
+            : `<input type="number" class="inp" min="0" step="0.01"
+                      placeholder="—" value="${hasCounted ? countQty : ''}"
+                      onchange="ccRecord('${item.id}',this.value)"
+                      oninput="ccRecord('${item.id}',this.value)"
+                      style="text-align:right;color:${hasCounted?'var(--tan)':'var(--tan4)'};">`
+          }
+        </div>
+        <div style="font-size:10px;color:var(--tan4);text-align:right">${item.last_counted ? timeAgo(item.last_counted) : 'Never'}</div>
+        <div class="${varCls}" style="${!varCls?'text-align:right;color:var(--tan4)':''}">${varStr}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="cc-cat-hdr">
+      <span>${cat}</span>
+      <span style="font-size:11px;color:var(--tan4)">${catCounted}/${catItems.length} counted</span>
+    </div>${rows}`;
+  }).join('');
+
+  updateCCControls();
+}
+
+/* ── RECORD COUNT ───────────────────────────────── */
+function ccRecord(itemId, val) {
+  if (!CC_SESSION) return;
+  const v = parseFloat(val);
+  if (!isNaN(v) && v >= 0) {
+    CC_SESSION.counts[itemId] = v;
+  } else {
+    delete CC_SESSION.counts[itemId];
+  }
+  saveCCSession();
+  // Update progress
+  const total   = ITEMS.length;
+  const counted = Object.keys(CC_SESSION.counts).length;
+  const pct     = total ? Math.round((counted/total)*100) : 0;
+  ge('ccProgress').textContent = `${counted}/${total} items (${pct}%)`;
+  ge('ccProgressBar').style.width = pct + '%';
+  // Show review button when any counted
+  ge('ccReviewBtn').style.display = counted > 0 ? 'flex' : 'none';
+  // Highlight variance inline
+  const item    = ITEMS.find(i => i.id === itemId);
+  if (!item) return;
+  const sysQty  = Number(item.current_qty || 0);
+  const v2      = CC_SESSION.counts[itemId];
+  if (v2 === undefined) return;
+  const variance= v2 - sysQty;
+  const abs     = Math.abs(variance);
+  const varCls  = abs < 0.01 ? 'cc-var-ok' : abs <= 5 ? 'cc-var-warn' : 'cc-var-bad';
+  const varStr  = (variance >= 0 ? '+' : '') + fmtN(variance, 1);
+  const row     = ge('ccrow_' + itemId);
+  if (row) {
+    const varCell = row.children[4];
+    if (varCell) { varCell.className = varCls; varCell.textContent = varStr; }
+  }
+}
+
+/* ── REVIEW ─────────────────────────────────────── */
+function reviewCycleCount() {
+  if (!CC_SESSION) return;
+  CC_SESSION.phase = 'review';
+  saveCCSession();
+  renderCycleCount();
+  // Scroll to first variance
+  const firstBad = document.querySelector('.cc-var-bad,.cc-var-warn');
+  if (firstBad) firstBad.scrollIntoView({ behavior:'smooth', block:'center' });
+  toast('Review mode — กด Post Adjustments เมื่อพร้อม', 'info');
+}
+
+/* ── POST ADJUSTMENTS ───────────────────────────── */
+async function postCycleCount() {
+  if (!CC_SESSION || !confirm('Post all count adjustments to stock? This cannot be undone.')) return;
+
+  const now = new Date().toISOString();
+  let adjusted = 0;
+
+  for (const [itemId, countedQty] of Object.entries(CC_SESSION.counts)) {
+    const item   = ITEMS.find(i => i.id === itemId);
+    if (!item) continue;
+    const sysQty = Number(item.current_qty || 0);
+    const diff   = Number(countedQty) - sysQty;
+    if (Math.abs(diff) < 0.01) continue; // no change needed
+
+    // Update local
+    const idx = ITEMS.findIndex(i => i.id === itemId);
+    if (idx >= 0) {
+      ITEMS[idx].current_qty = Number(countedQty);
+      ITEMS[idx].last_counted = now;
+      ITEMS[idx].updated_at   = now;
+    }
+
+    // Log as adjustment transaction
+    TX.unshift({
+      id: 'local_cc_' + Date.now() + Math.random().toString(36).slice(2,4),
+      item_id: itemId, item_name: item.name,
+      type: 'adjust', qty: diff,
+      note: 'Cycle Count ' + now.slice(0,10),
+      staff_name: 'Stock Count',
+      created_at: now,
+    });
+
+    // Persist to Supabase
+    if (SB_URL) {
+      SB.update('stock_items', {
+        current_qty: Number(countedQty), last_counted: now, updated_at: now,
+      }, { id: itemId }).catch(() => {});
+      SB.insert('stock_transactions', {
+        item_id: itemId, type: 'adjust', qty: diff,
+        note: 'Cycle Count ' + now.slice(0,10), staff_name: 'Stock Count', created_at: now,
+      }).catch(() => {});
+    }
+    adjusted++;
+  }
+
+  CC_SESSION.phase    = 'posted';
+  CC_SESSION.postedAt = now;
+  saveCCSession();
+  setTimeout(clearCCSession, 3000); // auto-clear after showing done
+
+  renderAll();
+  renderCycleCount();
+  toast(`Count posted · ${adjusted} item${adjusted!==1?'s':''} adjusted`, 'success', 5000);
+}
+
+/* ── DISCARD ─────────────────────────────────────── */
+function discardCycleCount() {
+  if (!confirm('Discard current count? All entered quantities will be lost.')) return;
+  clearCCSession();
+  renderCycleCount();
+  toast('Count discarded');
+}
+
+/* ── PATCH ──────────────────────────────────────── */
+const _origLoadDataS5a = loadData;
+loadData = async function() {
+  await _origLoadDataS5a();
+  loadCCSession();
+  populateCCCatFilter();
+};
+const _origShowViewS5a = showView;
+showView = function(id, el) {
+  _origShowViewS5a(id, el);
+  if (id === 'vCycleCount') { populateCCCatFilter(); renderCycleCount(); }
+};
+
+/* ══════════════════════════════════════════════════
+   S4b — PO APPROVAL FLOW + RECEIVE AGAINST PO
+   ══════════════════════════════════════════════════ */
+
+let _receivingPO = null;   // PO being received
+let _rpActualQtys = {};    // item_id → actual qty entered
+
+/* ── OPEN RECEIVE-AGAINST-PO MODAL ─────────────── */
+function openReceivePO(poId) {
+  const p = POS_LIST.find(x => x.id === poId);
+  if (!p) return;
+  _receivingPO = p;
+  _rpActualQtys = {};
+  (p.lines || []).forEach(l => { _rpActualQtys[l.stock_item_id] = l.qty; }); // default = ordered qty
+
+  ge('rpOvTitle').textContent = 'Receive Against PO';
+  ge('rp-ponum').textContent  = p.po_number;
+  ge('rp-sup').textContent    = p.supplier_name || '—';
+  ge('rp-total').textContent  = '฿' + (p.total || 0).toLocaleString();
+  ge('rp-invoice').value      = p.invoice_no  || '';
+  ge('rp-deldate').value      = new Date().toISOString().slice(0,10);
+  ge('rp-note').value         = '';
+
+  renderRPRows();
+  ge('receivePoOv').classList.add('on');
+}
+
+/* ── RENDER RECEIVE ROWS ────────────────────────── */
+function renderRPRows() {
+  const p     = _receivingPO;
+  const lines = p?.lines || [];
+  const el    = ge('rpRows');
+  if (!el) return;
+
+  el.innerHTML = lines.map(l => {
+    const item     = ITEMS.find(i => i.id === l.stock_item_id);
+    const ordered  = Number(l.qty || 0);
+    const actual   = Number(_rpActualQtys[l.stock_item_id] ?? ordered);
+    const diff     = actual - ordered;
+    const diffCls  = Math.abs(diff) < 0.01 ? 'variance-ok'
+                   : diff < 0 ? 'variance-warn' : 'variance-bad';
+    const diffStr  = diff === 0 ? '✓' : (diff > 0 ? '+' : '') + fmtN(diff,1);
+
+    return `<div class="po-receive-row">
+      <div>
+        <div style="font-weight:600;color:var(--tan)">${l.item_name}</div>
+        <div style="font-size:10px;color:var(--tan4)">${l.unit} · ฿${Number(l.unit_cost||0).toFixed(3)}/unit</div>
+      </div>
+      <div style="font-family:var(--mono);text-align:right;color:var(--tan3)">${fmtN(ordered,1)}</div>
+      <div style="font-size:11px;color:var(--tan4);text-align:right">${fmtN(Number(item?.current_qty||0),1)}</div>
+      <input type="number" class="inp" style="text-align:right"
+             value="${actual}" min="0" step="0.01"
+             onchange="rpQtyChange('${l.stock_item_id}',this.value)"
+             oninput="rpQtyChange('${l.stock_item_id}',this.value)">
+      <div class="${diffCls}">${diffStr}</div>
+    </div>`;
+  }).join('');
+
+  updateRPSummary();
+}
+
+function rpQtyChange(itemId, val) {
+  _rpActualQtys[itemId] = Number(val) || 0;
+  // Re-render just variance + summary without full re-render
+  const p = _receivingPO;
+  (p?.lines || []).forEach(l => {
+    if (l.stock_item_id !== itemId) return;
+    const ordered = Number(l.qty || 0);
+    const actual  = Number(_rpActualQtys[itemId]);
+    const diff    = actual - ordered;
+    const diffCls = Math.abs(diff) < 0.01 ? 'variance-ok' : diff < 0 ? 'variance-warn' : 'variance-bad';
+    const diffStr = diff === 0 ? '✓' : (diff > 0 ? '+' : '') + fmtN(diff,1);
+    // Update just the variance cell (4th child of matching row)
+    const rows = ge('rpRows').querySelectorAll('.po-receive-row');
+    rows.forEach(row => {
+      const inp = row.querySelector('input');
+      if (inp && Math.abs(Number(inp.value) - actual) < 0.01 && row.querySelector('.po-receive-row div:first-child')?.textContent.includes(l.item_name)) {
+        const varCell = row.children[4];
+        if (varCell) { varCell.className = diffCls; varCell.textContent = diffStr; }
+      }
+    });
+  });
+  updateRPSummary();
+}
+
+function updateRPSummary() {
+  const p = _receivingPO;
+  if (!p) return;
+  let actualVal = 0, poVal = 0;
+  (p.lines || []).forEach(l => {
+    const uc = Number(l.unit_cost || 0);
+    actualVal += Number(_rpActualQtys[l.stock_item_id] ?? l.qty) * uc;
+    poVal     += Number(l.qty || 0) * uc;
+  });
+  const variance = actualVal - poVal;
+  const varEl = ge('rp-variance-total');
+  if (varEl) {
+    varEl.textContent = (variance >= 0 ? '+' : '') + '฿' + variance.toFixed(2);
+    varEl.style.color = Math.abs(variance) < 0.01 ? 'var(--grn)' : variance < 0 ? 'var(--ora)' : 'var(--red)';
+  }
+  const valEl = ge('rp-actual-val');
+  if (valEl) valEl.textContent = '฿' + actualVal.toFixed(2);
+}
+
+/* ── CONFIRM RECEIVE ────────────────────────────── */
+async function confirmReceivePO() {
+  const p = _receivingPO;
+  if (!p) return;
+  const now       = new Date().toISOString();
+  const invoice   = ge('rp-invoice')?.value.trim() || null;
+  const delDate   = ge('rp-deldate')?.value || null;
+  const note      = ge('rp-note')?.value.trim() || null;
+
+  // Update each stock item with ACTUAL qty received
+  for (const l of (p.lines || [])) {
+    const actualQty = Number(_rpActualQtys[l.stock_item_id] ?? l.qty);
+    if (actualQty <= 0) continue;
+
+    // Update ITEMS local state
+    const idx = ITEMS.findIndex(i => i.id === l.stock_item_id);
+    if (idx >= 0) {
+      ITEMS[idx].current_qty = (Number(ITEMS[idx].current_qty) || 0) + actualQty;
+      ITEMS[idx].updated_at  = now;
+      if (l.unit_cost) ITEMS[idx].cost = l.unit_cost;
+    }
+
+    // Insert stock transaction
+    const txEntry = {
+      id:           'local_rx_' + Date.now() + Math.random().toString(36).slice(2,5),
+      item_id:      l.stock_item_id,
+      item_name:    l.item_name,
+      type:         'receive',
+      qty:          actualQty,
+      unit_cost:    l.unit_cost || null,
+      note:         `PO ${p.po_number}${invoice ? ' / ' + invoice : ''}${note ? ' — ' + note : ''}`,
+      supplier_id:  p.supplier_id,
+      supplier_name:p.supplier_name,
+      invoice_no:   invoice,
+      staff_name:   'System',
+      created_at:   now,
+    };
+    TX.unshift(txEntry);
+
+    if (SB_URL) {
+      SB.update('stock_items', {
+        current_qty: ITEMS.find(i => i.id === l.stock_item_id)?.current_qty,
+        cost:        l.unit_cost || ITEMS.find(i=>i.id===l.stock_item_id)?.cost,
+        updated_at:  now,
+      }, { id: l.stock_item_id }).catch(() => {});
+      SB.insert('stock_transactions', {
+        item_id: l.stock_item_id, type:'receive', qty:actualQty,
+        unit_cost: l.unit_cost||null, note:txEntry.note,
+        supplier_id: p.supplier_id, invoice_no:invoice, staff_name:'System', created_at:now,
+      }).catch(() => {});
+    }
+  }
+
+  // Mark PO as received + set AP status
+  p.status       = 'received';
+  p.invoice_no   = invoice;
+  p.delivery_date= delDate;
+  p.ap_status    = 'unpaid';
+
+  if (SB_URL) {
+    SB.update('purchase_orders', {
+      status: 'received', invoice_no: invoice,
+      delivery_date: delDate, ap_status: 'unpaid',
+    }, { id: p.id }).catch(() => {});
+  }
+
+  closeOv('receivePoOv');
+  renderAll();
+  renderPOs();
+  toast(`PO ${p.po_number} received · stock updated ✓`, 'success', 4000);
+}
+
+/* ── MARK AP PAID ───────────────────────────────── */
+async function markAPPaid(poId) {
+  const p = POS_LIST.find(x => x.id === poId);
+  if (!p) return;
+  p.ap_status = p.ap_status === 'paid' ? 'unpaid' : 'paid';
+  if (SB_URL) SB.update('purchase_orders', { ap_status: p.ap_status }, { id: poId }).catch(() => {});
+  renderPOs();
+  toast(p.po_number + ' → ' + (p.ap_status === 'paid' ? 'Paid ✓' : 'Unpaid'), p.ap_status==='paid'?'success':'');
+}
+
+/* ── UPGRADE renderPOs to add View/Receive buttons and payment column ── */
+const _origRenderPOs = renderPOs;
+renderPOs = function() {
+  _origRenderPOs();
+  // Re-render rows with upgraded action buttons + payment column
+  const list = POS_LIST.filter(p => _poFilter === 'all' || p.status === _poFilter);
+  const tbody = ge('poTbody');
+  if (!list.length) return;
+
+  tbody.innerHTML = list.map(p => {
+    const itemCount  = (p.lines || []).length;
+    const scls       = PO_STATUS_CLS[p.status] || 'pos-draft';
+    const slbl       = PO_STATUS_LBL[p.status] || p.status;
+    const apCls      = p.ap_status === 'paid' ? 'ap-paid' : 'ap-unpaid';
+    const apLbl      = p.ap_status === 'paid' ? 'Paid' : 'Unpaid';
+    const canEdit    = ['draft','submitted'].includes(p.status);
+    const canSubmit  = p.status === 'draft';
+    const canApprove = p.status === 'submitted';
+    const canReceive = p.status === 'approved';
+    const showAP     = p.status === 'received';
+
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--gl)">${p.po_number}</td>
+      <td style="font-weight:600;color:var(--tan)">${p.supplier_name || '—'}</td>
+      <td style="font-size:12px;color:var(--tan3)">${itemCount} item${itemCount !== 1 ? 's' : ''}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--gl)">฿${(p.total||0).toLocaleString()}</td>
+      <td><span class="po-status ${scls}">${slbl}</span></td>
+      <td>
+        ${showAP
+          ? `<span class="ap-badge ${apCls}" style="cursor:pointer" onclick="markAPPaid('${p.id}')" title="Click to toggle">${apLbl}</span>`
+          : `<span style="font-size:11px;color:var(--tan4)">—</span>`}
+      </td>
+      <td style="font-size:11px;color:var(--tan4)">${timeAgo(p.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${canEdit    ? `<button class="btn btn-ghost btn-sm" onclick="editPO('${p.id}')">Edit</button>` : ''}
+          ${canSubmit  ? `<button class="btn btn-gold btn-sm"  onclick="updatePOStatus('${p.id}','submitted')">Submit</button>` : ''}
+          ${canApprove ? `<button class="btn btn-grn btn-sm"   onclick="updatePOStatus('${p.id}','approved')">Approve</button>` : ''}
+          ${canReceive ? `<button class="btn btn-gold btn-sm"  onclick="openReceivePO('${p.id}')">Receive</button>` : ''}
+          ${p.status === 'received' ? `<span style="font-size:11px;color:var(--tan4)">✓ Done</span>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+};
+
+/* ══════════════════════════════════════════════════
+   S4a — PURCHASE ORDERS LIST + DRAFT PO
+   ══════════════════════════════════════════════════ */
+let POS_LIST   = [];        // purchase orders
+let EDIT_PO_ID = null;
+let _poFilter  = 'all';
+let _poLines   = [];        // [{stock_item_id, qty, unit_cost}]
+let _suggestions = {};      // id → selected bool
+
+const PO_STATUS_CLS = {
+  draft:'pos-draft', submitted:'pos-submitted',
+  approved:'pos-approved', received:'pos-received', cancelled:'pos-cancelled'
+};
+const PO_STATUS_LBL = {
+  draft:'Draft', submitted:'Submitted',
+  approved:'Approved', received:'Received', cancelled:'Cancelled'
+};
+
+/* ── MOCK DATA ──────────────────────────────────── */
+function loadMockPOs() {
+  POS_LIST = [
+    { id:'po1', po_number:'PO-2024-001', supplier_id:'s1', supplier_name:'ชาไทย Trading',
+      lines:[
+        { stock_item_id:'1', item_name:'Taiwanese Green Tea', qty:500, unit:'g', unit_cost:0.28 },
+        { stock_item_id:'2', item_name:'Assam Black Tea',     qty:300, unit:'g', unit_cost:0.22 },
+      ],
+      total:206, status:'received', note:'สั่งประจำเดือน', expected_date:'2024-03-10', created_at:new Date(Date.now()-7*86400000).toISOString() },
+    { id:'po2', po_number:'PO-2024-002', supplier_id:'s2', supplier_name:'Dairy Fresh Co.',
+      lines:[
+        { stock_item_id:'3', item_name:'Oat Milk',        qty:20, unit:'L', unit_cost:45 },
+        { stock_item_id:'4', item_name:'Fresh Whole Milk', qty:30, unit:'L', unit_cost:28 },
+      ],
+      total:1740, status:'approved', note:'', expected_date:'2024-03-15', created_at:new Date(Date.now()-2*86400000).toISOString() },
+    { id:'po3', po_number:'PO-2024-003', supplier_id:'s3', supplier_name:'SweetSyrup Import',
+      lines:[
+        { stock_item_id:'6', item_name:'Lychee Syrup', qty:2000, unit:'ml', unit_cost:0.12 },
+      ],
+      total:240, status:'draft', note:'รอ confirm ราคา', expected_date:'', created_at:new Date(Date.now()-86400000).toISOString() },
+  ];
+}
+
+/* ── LOAD ───────────────────────────────────────── */
+async function loadPOs() {
+  if (SB_URL && SB_KEY) {
+    try {
+      const [pos, lines] = await Promise.all([
+        SB.q('purchase_orders', { select:'*', order:'created_at.desc' }),
+        SB.q('po_items',        { select:'*' }),
+      ]);
+      POS_LIST = (pos||[]).map(p => ({
+        ...p,
+        lines: (lines||[]).filter(l => l.po_id === p.id).map(l => ({
+          stock_item_id: l.stock_item_id,
+          item_name:     ITEMS.find(i=>i.id===l.stock_item_id)?.name || '—',
+          qty:           l.qty,
+          unit:          l.unit,
+          unit_cost:     l.unit_cost,
+        })),
+      }));
+    } catch(e) { console.warn('[POs]', e.message); loadMockPOs(); }
+  } else { loadMockPOs(); }
+  renderPOs();
+}
+
+/* ── RENDER LIST ────────────────────────────────── */
+function filterPO(f, el) {
+  _poFilter = f;
+  document.querySelectorAll('#vPO .filter-tabs .ftab').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  renderPOs();
+}
+
+function renderPOs() {
+  const list = POS_LIST.filter(p => _poFilter==='all' || p.status===_poFilter);
+  const tbody = ge('poTbody'), empty = ge('poEmpty');
+
+  // KPIs
+  const now = new Date(); const m = now.getMonth(); const y = now.getFullYear();
+  const monthly = POS_LIST.filter(p => { const d=new Date(p.created_at); return d.getMonth()===m&&d.getFullYear()===y; });
+  const pending  = POS_LIST.filter(p=>['draft','submitted'].includes(p.status)).length;
+  const lowItems = ITEMS.filter(i=>getStatus(i)!=='ok').length;
+  ge('po-kpi-total').textContent   = POS_LIST.length;
+  ge('po-kpi-pending').textContent = pending;
+  ge('po-kpi-value').textContent   = '฿'+monthly.reduce((s,p)=>s+(p.total||0),0).toLocaleString();
+  ge('po-kpi-low').textContent     = lowItems;
+  ge('nbPO').textContent           = pending || POS_LIST.length;
+
+  if (!list.length) { tbody.innerHTML=''; empty.style.display='flex'; return; }
+  empty.style.display='none';
+
+  tbody.innerHTML = list.map(p => {
+    const itemCount = (p.lines||[]).length;
+    const scls = PO_STATUS_CLS[p.status]||'pos-draft';
+    const slbl = PO_STATUS_LBL[p.status]||p.status;
+    const canEdit   = ['draft','submitted'].includes(p.status);
+    const canSubmit = p.status==='draft';
+    const canApprove= p.status==='submitted';
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--gl)">${p.po_number}</td>
+      <td style="font-weight:600;color:var(--tan)">${p.supplier_name||'—'}</td>
+      <td style="font-size:12px;color:var(--tan3)">${itemCount} item${itemCount!==1?'s':''}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--gl)">฿${(p.total||0).toLocaleString()}</td>
+      <td><span class="po-status ${scls}">${slbl}</span></td>
+      <td style="font-size:11px;color:var(--tan4)">${timeAgo(p.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${canEdit   ? `<button class="btn btn-ghost btn-sm" onclick="editPO('${p.id}')">Edit</button>` : ''}
+          ${canSubmit ? `<button class="btn btn-gold btn-sm"  onclick="updatePOStatus('${p.id}','submitted')">Submit</button>` : ''}
+          ${canApprove? `<button class="btn btn-grn btn-sm"   onclick="updatePOStatus('${p.id}','approved')">Approve</button>` : ''}
+          ${p.status==='approved' ? `<button class="btn btn-gold btn-sm" onclick="updatePOStatus('${p.id}','received')">Receive</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── PO LINE EDITOR ─────────────────────────────── */
+function addPOLine(line) {
+  _poLines.push({ id:'pl_'+Date.now(), stock_item_id:line?.stock_item_id||'', qty:line?.qty||'', unit_cost:line?.unit_cost||'' });
+  renderPOLines();
+}
+
+function removePOLine(idx) { _poLines.splice(idx,1); renderPOLines(); }
+
+function poLineChange(idx, field, val) {
+  _poLines[idx][field] = val;
+  if (field==='stock_item_id') {
+    const item = ITEMS.find(i=>i.id===val);
+    if (item) { _poLines[idx].unit_cost = item.cost||''; }
+  }
+  renderPOLines();
+}
+
+function renderPOLines() {
+  const el = ge('poLineEditor'); if(!el) return;
+  const header = `<div style="display:grid;grid-template-columns:1fr 70px 80px 80px 24px;gap:6px;padding:0 0 4px;font-size:10px;font-weight:700;color:var(--tan4);text-transform:uppercase;letter-spacing:.6px">
+    <span>Item</span><span>Qty</span><span>Unit Cost</span><span>Subtotal</span><span></span>
+  </div>`;
+  el.innerHTML = header + _poLines.map((line, idx) => {
+    const item   = ITEMS.find(i=>i.id===line.stock_item_id);
+    const subtot = (Number(line.qty)||0) * (Number(line.unit_cost)||0);
+    return `<div class="po-line">
+      <select class="inp" onchange="poLineChange(${idx},'stock_item_id',this.value)">
+        <option value="">-- Item --</option>
+        ${ITEMS.map(i=>`<option value="${i.id}" ${i.id===line.stock_item_id?'selected':''}>${i.name}</option>`).join('')}
+      </select>
+      <input type="number" class="inp" placeholder="0" min="0.01" step="0.01" value="${line.qty}"
+             oninput="poLineChange(${idx},'qty',this.value)">
+      <input type="number" class="inp" placeholder="฿" min="0" step="0.01" value="${line.unit_cost}"
+             oninput="poLineChange(${idx},'unit_cost',this.value)">
+      <div style="font-family:var(--mono);font-size:12px;color:var(--gl);text-align:right;line-height:32px">
+        ${subtot>0?'฿'+subtot.toFixed(2):'—'}
+      </div>
+      <button class="po-line-del" onclick="removePOLine(${idx})">✕</button>
+    </div>`;
+  }).join('');
+  // Update total
+  const total = _poLines.reduce((s,l)=>s+(Number(l.qty)||0)*(Number(l.unit_cost)||0),0);
+  const el2 = ge('po-total-preview'); if(el2) el2.textContent = '฿'+total.toFixed(2);
+}
+
+/* ── CRUD ───────────────────────────────────────── */
+function onPOSupplierChange() {
+  // Could auto-populate lead time / terms info
+}
+
+function openNewPO() {
+  EDIT_PO_ID = null;
+  _poLines   = [];
+  ge('poOvTitle').textContent = 'New Purchase Order';
+  ge('po-supplier').innerHTML = '<option value="">-- Select supplier --</option>' +
+    SUPPLIERS.filter(s=>s.status==='active').map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  ge('po-supplier').value = '';
+  ge('po-date').value = '';
+  ge('po-note').value = '';
+  renderPOLines();
+  ge('poOv').classList.add('on');
+}
+
+function editPO(id) {
+  const p = POS_LIST.find(x=>x.id===id); if(!p) return;
+  EDIT_PO_ID = id;
+  ge('poOvTitle').textContent = 'Edit: ' + p.po_number;
+  ge('po-supplier').innerHTML = '<option value="">-- Select supplier --</option>' +
+    SUPPLIERS.filter(s=>s.status==='active').map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  ge('po-supplier').value = p.supplier_id||'';
+  ge('po-date').value = p.expected_date||'';
+  ge('po-note').value = p.note||'';
+  _poLines = (p.lines||[]).map((l,i)=>({id:'pl_'+i, stock_item_id:l.stock_item_id, qty:l.qty, unit_cost:l.unit_cost}));
+  renderPOLines();
+  ge('poOv').classList.add('on');
+}
+
+function genPONumber() {
+  const y = new Date().getFullYear();
+  const n = (POS_LIST.length+1).toString().padStart(3,'0');
+  return `PO-${y}-${n}`;
+}
+
+async function savePO(status) {
+  const supId = ge('po-supplier').value;
+  if (!supId) { toast('กรุณาเลือก Supplier','warn'); return; }
+  const lines = _poLines.filter(l=>l.stock_item_id&&l.qty);
+  if (!lines.length) { toast('กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ','warn'); return; }
+  const sup   = SUPPLIERS.find(s=>s.id===supId);
+  const total = lines.reduce((s,l)=>s+(Number(l.qty)||0)*(Number(l.unit_cost)||0),0);
+  const now   = new Date().toISOString();
+
+  const poData = {
+    supplier_id:   supId,
+    supplier_name: sup?.name||'—',
+    total,
+    status,
+    note:          ge('po-note').value.trim()||null,
+    expected_date: ge('po-date').value||null,
+    created_at:    now,
+    lines:         lines.map(l=>({ stock_item_id:l.stock_item_id, item_name:ITEMS.find(i=>i.id===l.stock_item_id)?.name||'—', qty:Number(l.qty), unit:ITEMS.find(i=>i.id===l.stock_item_id)?.unit||'', unit_cost:Number(l.unit_cost)||0 })),
+  };
+
+  if (EDIT_PO_ID) {
+    if (SB_URL) {
+      try {
+        await SB.update('purchase_orders', { supplier_id:supId, total, status, note:poData.note, expected_date:poData.expected_date }, { id:EDIT_PO_ID });
+        await SB.del('po_items', { po_id:EDIT_PO_ID });
+        for (const l of lines) await SB.insert('po_items', { po_id:EDIT_PO_ID, stock_item_id:l.stock_item_id, qty:Number(l.qty), unit:ITEMS.find(i=>i.id===l.stock_item_id)?.unit||'', unit_cost:Number(l.unit_cost)||0 });
+      } catch(e) { toast('Save error: '+e.message,'error'); return; }
+    }
+    const idx = POS_LIST.findIndex(p=>p.id===EDIT_PO_ID);
+    if (idx>=0) POS_LIST[idx] = { ...POS_LIST[idx], ...poData };
+    toast('PO updated','success');
+  } else {
+    poData.po_number = genPONumber();
+    if (SB_URL) {
+      try {
+        const res = await SB.insert('purchase_orders', { po_number:poData.po_number, supplier_id:supId, supplier_name:poData.supplier_name, total, status, note:poData.note, expected_date:poData.expected_date });
+        poData.id = res[0]?.id;
+        if (poData.id) for (const l of lines) await SB.insert('po_items', { po_id:poData.id, stock_item_id:l.stock_item_id, qty:Number(l.qty), unit:ITEMS.find(i=>i.id===l.stock_item_id)?.unit||'', unit_cost:Number(l.unit_cost)||0 });
+      } catch(e) { toast('Save error: '+e.message,'error'); return; }
+    }
+    poData.id = poData.id || ('local_po_'+Date.now());
+    POS_LIST.unshift(poData);
+    toast(poData.po_number+' created','success');
+  }
+  closeOv('poOv');
+  renderPOs();
+}
+
+async function updatePOStatus(id, status) {
+  if (SB_URL) { try { await SB.update('purchase_orders',{status},{id}); } catch(e){ toast('Error: '+e.message,'error'); return; } }
+  const p = POS_LIST.find(x=>x.id===id);
+  if (p) {
+    p.status = status;
+    // If received → update stock quantities
+    if (status==='received') {
+      const now = new Date().toISOString();
+      for (const l of (p.lines||[])) {
+        const idx = ITEMS.findIndex(i=>i.id===l.stock_item_id);
+        if (idx>=0) { ITEMS[idx].current_qty=(Number(ITEMS[idx].current_qty)||0)+Number(l.qty||0); ITEMS[idx].updated_at=now; if(l.unit_cost) ITEMS[idx].cost=l.unit_cost; }
+        TX.unshift({ id:'local_rx_'+Date.now(), item_id:l.stock_item_id, item_name:l.item_name, type:'receive', qty:l.qty, note:'PO '+p.po_number, supplier_name:p.supplier_name, created_at:now });
+      }
+      renderAll();
+      toast('PO received · stock updated','success');
+    } else {
+      toast('PO status → '+PO_STATUS_LBL[status],'success');
+    }
+  }
+  renderPOs();
+}
+
+/* ── AUTO-SUGGEST ───────────────────────────────── */
+function openSuggestPO() {
+  const lowItems = ITEMS.filter(i=>getStatus(i)!=='ok');
+  _suggestions = {};
+  lowItems.forEach(i=>{ _suggestions[i.id]=true; });
+  const el = ge('suggestList');
+  if (!lowItems.length) { el.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;color:var(--tan3)">ไม่มีสินค้าที่ต่ำกว่า par ขณะนี้ 🎉</div>'; }
+  else {
+    el.innerHTML = lowItems.map(i => {
+      const need = Math.max(0,(Number(i.par_max||0))-(Number(i.current_qty||0)));
+      const cost = need * Number(i.cost||0);
+      const st   = getStatus(i);
+      return `<div class="po-suggest-item" onclick="toggleSuggestion('${i.id}')">
+        <div class="po-suggest-chk on" id="sug_chk_${i.id}">✓</div>
+        <div style="flex:1">
+          <div style="font-weight:600;color:var(--tan);font-size:13px">${i.name}</div>
+          <div style="font-size:11px;color:var(--tan3);margin-top:1px">
+            Current: ${fmtN(i.current_qty,1)} ${i.unit} · Need: ~${fmtN(need,0)} ${i.unit}
+          </div>
+        </div>
+        <span class="level-pill ${getLevelClass(i)}" style="flex-shrink:0"><span class="lp-dot"></span>${getLevelLabel(i)}</span>
+        <span style="font-family:var(--mono);font-size:12px;color:var(--gl);min-width:60px;text-align:right">฿${cost.toFixed(0)}</span>
+      </div>`;
+    }).join('');
+  }
+  updateSuggestCount();
+  ge('suggestOv').classList.add('on');
+}
+
+function toggleSuggestion(id) {
+  _suggestions[id] = !_suggestions[id];
+  const chk = ge('sug_chk_'+id);
+  if (chk) { chk.classList.toggle('on',_suggestions[id]); chk.textContent=_suggestions[id]?'✓':''; }
+  updateSuggestCount();
+}
+function toggleAllSuggestions(val) {
+  Object.keys(_suggestions).forEach(id=>{ _suggestions[id]=val; const c=ge('sug_chk_'+id); if(c){c.classList.toggle('on',val);c.textContent=val?'✓':'';}});
+  updateSuggestCount();
+}
+function updateSuggestCount() {
+  const n=Object.values(_suggestions).filter(Boolean).length;
+  ge('suggestCount').textContent=n;
+}
+
+function createFromSuggestions() {
+  const selected = Object.entries(_suggestions).filter(([,v])=>v).map(([id])=>id);
+  if (!selected.length) { toast('เลือกอย่างน้อย 1 รายการ','warn'); return; }
+  closeOv('suggestOv');
+  // Open PO modal pre-filled with selected items
+  _poLines = selected.map((id,i) => {
+    const item = ITEMS.find(x=>x.id===id);
+    const need = item ? Math.max(0,(Number(item.par_max||0))-(Number(item.current_qty||0))) : 0;
+    return { id:'pl_'+i, stock_item_id:id, qty:fmtN(need,1), unit_cost:item?.cost||'' };
+  });
+  ge('poOvTitle').textContent = 'New PO (Auto-suggested)';
+  EDIT_PO_ID = null;
+  ge('po-supplier').innerHTML = '<option value="">-- Select supplier --</option>'+
+    SUPPLIERS.filter(s=>s.status==='active').map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  ge('po-supplier').value=''; ge('po-date').value=''; ge('po-note').value='จาก auto-suggest';
+  renderPOLines();
+  ge('poOv').classList.add('on');
+}
+
+/* ── PATCH ──────────────────────────────────────── */
+const _origLoadDataS4a = loadData;
+loadData = async function() { await _origLoadDataS4a(); await loadPOs(); };
+const _origShowViewS4a = showView;
+showView = function(id, el) {
+  _origShowViewS4a(id, el);
+  if (id==='vPO') renderPOs();
+};
+
+/* ══════════════════════════════════════════════════
+   S3b — AUTO-DEDUCT + THEORETICAL VS ACTUAL
+   ══════════════════════════════════════════════════ */
+
+/* ── DEDUCTION LOG (in-memory) ──────────────────── */
+let DEDUCT_LOG = [];  // [{ts, item_id, item_name, qty, order_id, recipe_name}]
+
+/* ── MATCH RECIPE TO ORDER ITEM ─────────────────── */
+function findRecipe(menuItemName) {
+  if (!menuItemName) return null;
+  const name = menuItemName.toLowerCase().trim();
+  return RECIPES.find(r =>
+    r.name.toLowerCase() === name ||
+    r.name.toLowerCase().includes(name) ||
+    name.includes(r.name.toLowerCase())
+  );
+}
+
+/* ── DEDUCT STOCK FOR ONE ORDER ─────────────────── */
+async function deductForOrder(order) {
+  const items = typeof order.items === 'string'
+    ? JSON.parse(order.items) : (order.items || []);
+  const deductions = []; // {item_id, item_name, qty}
+
+  items.forEach(oi => {
+    const recipe = findRecipe(oi.name);
+    if (!recipe) return;
+    const qty = Number(oi.qty || 1);
+    (recipe.ingredients || []).forEach(ing => {
+      const needed = Number(ing.qty || 0) * qty;
+      deductions.push({
+        stock_item_id: ing.stock_item_id,
+        item_name:     ing.name,
+        qty:           needed,
+        unit:          ing.unit,
+        order_id:      order.id,
+        recipe_name:   recipe.name,
+      });
+    });
+  });
+
+  if (!deductions.length) return 0;
+
+  // Aggregate by stock_item_id
+  const agg = {};
+  deductions.forEach(d => {
+    if (!agg[d.stock_item_id]) agg[d.stock_item_id] = { ...d, qty: 0 };
+    agg[d.stock_item_id].qty += d.qty;
+  });
+
+  const now = new Date().toISOString();
+  for (const [sid, d] of Object.entries(agg)) {
+    // Update local ITEMS
+    const itemIdx = ITEMS.findIndex(i => i.id === sid);
+    if (itemIdx >= 0) {
+      const prev = Number(ITEMS[itemIdx].current_qty || 0);
+      ITEMS[itemIdx].current_qty = Math.max(0, prev - d.qty);
+      ITEMS[itemIdx].updated_at  = now;
+    }
+    // Log deduction
+    const logEntry = {
+      ts:        now,
+      item_id:   sid,
+      item_name: d.item_name,
+      qty:       d.qty,
+      unit:      d.unit,
+      order_id:  d.order_id,
+      recipe_name: d.recipe_name,
+    };
+    DEDUCT_LOG.unshift(logEntry);
+
+    // Persist to Supabase
+    if (SB_URL) {
+      SB.insert('stock_transactions', {
+        item_id:    sid,
+        type:       'issue',
+        qty:        -d.qty,
+        note:       `Auto: ${d.recipe_name} (Order ${d.order_id})`,
+        staff_name: 'System',
+        source:     'order_deduct',
+        order_id:   d.order_id,
+        created_at: now,
+      }).catch(() => {});
+      SB.update('stock_items', {
+        current_qty: Math.max(0, (ITEMS.find(i=>i.id===sid)?.current_qty || 0)),
+        updated_at:  now,
+      }, { id: sid }).catch(() => {});
+    }
+  }
+  return Object.keys(agg).length;
+}
+
+/* ── SYNC DEDUCTIONS (manual trigger) ───────────── */
+async function runAutoDeduct() {
+  if (!SB_URL) { toast('ต้องต่อ Supabase เพื่อ sync orders', 'warn'); renderVariance(); return; }
+  toast('Syncing deductions...', 'info', 2000);
+
+  try {
+    // Get recently confirmed orders not yet deducted
+    const since = new Date(Date.now() - 24*3600*1000).toISOString(); // last 24h
+    const orders = await SB.q('orders', {
+      select: '*',
+      eq:     { source: 'POS' },       // POS orders already tracked; get online orders
+      order:  'created_at.desc',
+      limit:  100,
+    });
+    const confirmedOrders = (orders || []).filter(o =>
+      ['CONFIRMED','PREPARING','COMPLETED'].includes(o.status) &&
+      new Date(o.created_at) > new Date(since)
+    );
+    // Exclude already deducted
+    const deductedIds = new Set(DEDUCT_LOG.map(d => d.order_id));
+    const toDeduct = confirmedOrders.filter(o => !deductedIds.has(o.id));
+
+    let totalDeductions = 0;
+    for (const order of toDeduct) {
+      totalDeductions += await deductForOrder(order);
+    }
+    toast(`Synced ${toDeduct.length} orders · ${totalDeductions} stock items updated`, 'success');
+  } catch(e) {
+    toast('Sync failed: ' + e.message, 'error');
+  }
+  renderAll();
+  renderVariance();
+  renderDeductLog();
+}
+
+/* ── VARIANCE CALCULATION ───────────────────────── */
+function getVariancePeriodMs() {
+  const p = ge('varPeriod')?.value || 'week';
+  if (p === 'today') return 86400000;
+  if (p === 'week')  return 7 * 86400000;
+  return 30 * 86400000;
+}
+
+function renderVariance() {
+  const periodMs  = getVariancePeriodMs();
+  const cutoff    = Date.now() - periodMs;
+
+  // Theoretical: sum of auto-deductions (what should have been used)
+  const periodDeducts = DEDUCT_LOG.filter(d => new Date(d.ts) > new Date(cutoff));
+  const theoryMap = {};  // item_id → {name, qty, unit}
+  periodDeducts.forEach(d => {
+    if (!theoryMap[d.item_id]) theoryMap[d.item_id] = { name: d.item_name, qty: 0, unit: d.unit };
+    theoryMap[d.item_id].qty += d.qty;
+  });
+
+  // Actual: real issue/waste transactions
+  const actualMap = {};
+  TX.filter(t => (t.type==='issue'||t.type==='waste') && t.source!=='order_deduct'
+    && new Date(t.created_at) > new Date(cutoff))
+    .forEach(t => {
+      if (!actualMap[t.item_id]) actualMap[t.item_id] = { name: t.item_name, qty: 0 };
+      actualMap[t.item_id].qty += Math.abs(Number(t.qty||0));
+    });
+
+  // Cups sold estimate (from deduction log)
+  const uniqueOrders = new Set(periodDeducts.map(d => d.order_id)).size;
+  const theoryCOGS   = DEDUCT_LOG.filter(d => new Date(d.ts) > new Date(cutoff))
+    .reduce((s, d) => {
+      const item = ITEMS.find(i => i.id === d.item_id);
+      return s + (Number(d.qty||0) * Number(item?.cost||0));
+    }, 0);
+  const wasteCount = TX.filter(t => t.type==='waste' && new Date(t.created_at)>new Date(cutoff)).length;
+
+  ge('var-cups').textContent         = uniqueOrders;
+  ge('var-theory-cogs').textContent  = '฿' + theoryCOGS.toFixed(2);
+  ge('var-waste').textContent        = wasteCount;
+
+  // Merge all item IDs
+  const allIds = new Set([...Object.keys(theoryMap), ...Object.keys(actualMap)]);
+  const rows = [...allIds].map(id => {
+    const theory = theoryMap[id]?.qty  || 0;
+    const actual = actualMap[id]?.qty  || 0;
+    const name   = theoryMap[id]?.name || actualMap[id]?.name || ITEMS.find(i=>i.id===id)?.name || id;
+    const unit   = theoryMap[id]?.unit || ITEMS.find(i=>i.id===id)?.unit || '';
+    const diff   = actual - theory; // positive = used more than expected
+    return { id, name, unit, theory, actual, diff };
+  }).filter(r => r.theory > 0 || r.actual > 0)
+    .sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
+
+  ge('var-count').textContent = rows.filter(r => Math.abs(r.diff) > 0.01).length;
+
+  const varRowsEl = ge('varRows');
+  if (!rows.length) {
+    varRowsEl.innerHTML = '<div style="padding:32px;text-align:center;font-size:12px;color:var(--tan4)">ยังไม่มีข้อมูลในช่วงนี้</div>';
+    return;
+  }
+  varRowsEl.innerHTML = rows.map(r => {
+    const diffAbs = Math.abs(r.diff);
+    const diffCls = diffAbs < 0.5 ? 'ok' : diffAbs < 5 ? 'warn' : 'bad';
+    const diffSign = r.diff > 0 ? '+' : '';
+    return `<div class="var-row">
+      <div>
+        <div class="var-name">${r.name}</div>
+        <div style="font-size:10px;color:var(--tan4)">${r.unit}</div>
+      </div>
+      <div class="var-theory">${fmtN(r.theory,1)}</div>
+      <div class="var-actual">${fmtN(r.actual,1)}</div>
+      <div class="var-diff ${diffCls}">${diffSign}${fmtN(r.diff,1)}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── DEDUCTION LOG RENDER ───────────────────────── */
+function renderDeductLog() {
+  const el = ge('deductLog');
+  if (!el) return;
+  if (!DEDUCT_LOG.length) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;font-size:12px;color:var(--tan4)">No deductions yet</div>';
+    return;
+  }
+  el.innerHTML = DEDUCT_LOG.slice(0,30).map(d => `
+    <div class="deduct-log-row">
+      <div>
+        <div class="dl-item">${d.item_name}</div>
+        <div class="dl-src">${d.recipe_name}</div>
+      </div>
+      <span class="dl-qty">-${fmtN(d.qty,1)} ${d.unit||''}</span>
+      <span class="dl-ts">${timeAgo(d.ts)}</span>
+    </div>`).join('');
+}
+
+/* ── HOOK INTO POS ORDER CONFIRMED (Supabase RT) ── */
+// When Supabase realtime fires an order INSERT/UPDATE in CONFIRMED status
+// → auto-deduct stock (same channel as POS if available)
+function hookRealtimeDeduct() {
+  if (!window.supabase?.channel || !SB_URL) return;
+  try {
+    window.supabase.channel('stock-orders')
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'orders',
+        filter: 'status=eq.CONFIRMED',
+      }, async payload => {
+        if (payload.new) {
+          const deducted = await deductForOrder(payload.new);
+          if (deducted > 0) {
+            renderAll();
+            renderDeductLog();
+            toast(`Auto-deducted stock for order ${payload.new.id}`, 'info');
+          }
+        }
+      })
+      .subscribe();
+  } catch(e) { /* no SDK available */ }
+}
+
+/* ── PATCH showView ─────────────────────────────── */
+const _origShowViewS3b = showView;
+showView = function(id, el) {
+  _origShowViewS3b(id, el);
+  if (id === 'vVariance') { renderVariance(); renderDeductLog(); }
+};
+
+/* ── PATCH loadData to hook realtime after load ──── */
+const _origLoadDataS3b = loadData;
+loadData = async function() {
+  await _origLoadDataS3b();
+  hookRealtimeDeduct();
+};
+
+/* ══════════════════════════════════════════════════
+   S3a — RECIPE BUILDER UI
+   ══════════════════════════════════════════════════ */
+let RECIPES   = [];
+let EDIT_REC_ID = null;
+let _recCatFilter = 'all';
+
+/* ── MOCK DATA ──────────────────────────────────── */
+function loadMockRecipes() {
+  RECIPES = [
+    { id:'r1', name:'Thai Milk Tea',       cat:'Tea',      price:75,
+      ingredients:[
+        { stock_item_id:'1', name:'Taiwanese Green Tea', qty:8,  unit:'g',  unit_cost:0.28 },
+        { stock_item_id:'3', name:'Oat Milk',            qty:180,unit:'ml', unit_cost:0.045 },
+        { stock_item_id:'5', name:'Brown Sugar Syrup',   qty:30, unit:'ml', unit_cost:0.08 },
+      ]
+    },
+    { id:'r2', name:'Boba Milk Tea',       cat:'Tea',      price:85,
+      ingredients:[
+        { stock_item_id:'2', name:'Assam Black Tea',    qty:10,  unit:'g',  unit_cost:0.22 },
+        { stock_item_id:'4', name:'Fresh Whole Milk',   qty:200, unit:'ml', unit_cost:0.028 },
+        { stock_item_id:'7', name:'Tapioca Boba',       qty:60,  unit:'g',  unit_cost:0.045 },
+        { stock_item_id:'5', name:'Brown Sugar Syrup',  qty:25,  unit:'ml', unit_cost:0.08 },
+      ]
+    },
+    { id:'r3', name:'Lychee Fruit Tea',    cat:'Fruit Tea', price:80,
+      ingredients:[
+        { stock_item_id:'1', name:'Taiwanese Green Tea', qty:6,  unit:'g',  unit_cost:0.28 },
+        { stock_item_id:'6', name:'Lychee Syrup',        qty:45, unit:'ml', unit_cost:0.12 },
+      ]
+    },
+  ];
+}
+
+/* ── LOAD ───────────────────────────────────────── */
+async function loadRecipes() {
+  if (SB_URL && SB_KEY) {
+    try {
+      const [recipes, ings] = await Promise.all([
+        SB.q('recipes',             { select: '*', order: 'name' }),
+        SB.q('recipe_ingredients',  { select: '*' }),
+      ]);
+      RECIPES = (recipes || []).map(r => ({
+        ...r,
+        ingredients: (ings || []).filter(i => i.recipe_id === r.id).map(i => ({
+          stock_item_id: i.stock_item_id,
+          name:      ITEMS.find(x => x.id === i.stock_item_id)?.name || '—',
+          qty:       i.qty,
+          unit:      i.unit,
+          unit_cost: ITEMS.find(x => x.id === i.stock_item_id)?.cost || 0,
+        })),
+      }));
+    } catch(e) { console.warn('[recipes]', e.message); loadMockRecipes(); }
+  } else {
+    loadMockRecipes();
+  }
+  ge('nbRecipes').textContent = RECIPES.length;
+  renderRecipes();
+}
+
+/* ── HELPERS ────────────────────────────────────── */
+function calcCOGS(recipe) {
+  return (recipe.ingredients || []).reduce((s, i) => s + (Number(i.qty||0) * Number(i.unit_cost||0)), 0);
+}
+function calcMarginPct(recipe) {
+  const cogs = calcCOGS(recipe);
+  const price = Number(recipe.price || 0);
+  if (!price) return null;
+  return ((price - cogs) / price) * 100;
+}
+
+/* ── RENDER ─────────────────────────────────────── */
+function renderRecipes() {
+  const q = (ge('recSearch')?.value || '').toLowerCase();
+  const list = RECIPES.filter(r => {
+    const matchQ = !q || r.name.toLowerCase().includes(q);
+    const hasIng = r.ingredients?.length > 0;
+    const matchF = _recCatFilter === 'all'
+      || (_recCatFilter === 'has'     &&  hasIng)
+      || (_recCatFilter === 'missing' && !hasIng);
+    return matchQ && matchF;
+  });
+
+  const grid  = ge('recGrid');
+  const empty = ge('recEmpty');
+  if (!list.length) { grid.innerHTML = ''; empty.style.display = 'flex'; return; }
+  empty.style.display = 'none';
+
+  // KPIs
+  const withIng   = RECIPES.filter(r => r.ingredients?.length > 0);
+  const avgCOGS   = withIng.length ? withIng.reduce((s,r)=>s+calcCOGS(r),0)/withIng.length : 0;
+  const margins   = withIng.map(r=>calcMarginPct(r)).filter(m=>m!==null);
+  const avgMargin = margins.length ? margins.reduce((s,m)=>s+m,0)/margins.length : null;
+  const missing   = RECIPES.filter(r=>!r.ingredients?.length).length;
+  ge('recKpi-count').textContent   = RECIPES.length;
+  ge('recKpi-cogs').textContent    = '฿' + avgCOGS.toFixed(2);
+  ge('recKpi-margin').textContent  = avgMargin !== null ? avgMargin.toFixed(1)+'%' : '—';
+  ge('recKpi-missing').textContent = missing;
+
+  grid.innerHTML = list.map(r => {
+    const cogs    = calcCOGS(r);
+    const margin  = calcMarginPct(r);
+    const marginPct = margin !== null ? margin.toFixed(1) : null;
+    const barW    = margin !== null ? Math.min(100, Math.max(0, margin)) : 0;
+    const barCls  = barW >= 60 ? '' : barW >= 40 ? 'yellow' : 'red';
+    const marginColor = barW >= 60 ? 'var(--grn)' : barW >= 40 ? 'var(--ora)' : 'var(--red)';
+
+    const ings = (r.ingredients || []);
+
+    return `<div class="rec-card">
+      <div class="rec-card-hdr">
+        <div>
+          <div class="rec-name">${r.name}</div>
+          <div class="rec-cat">${r.cat||''} · ${ings.length} ingredients</div>
+        </div>
+        <div class="rec-cost-pill">
+          <span class="rec-cost-val">฿${cogs.toFixed(2)}</span>
+          <span class="rec-cost-lbl">COGS/cup</span>
+        </div>
+      </div>
+
+      <div class="rec-ing-list">
+        ${ings.length
+          ? ings.slice(0,5).map(i => `
+            <div class="rec-ing-row">
+              <span class="rec-ing-name">${i.name}</span>
+              <span class="rec-ing-qty">${fmtN(i.qty,0)} ${i.unit}</span>
+              <span class="rec-ing-cost">฿${(Number(i.qty||0)*Number(i.unit_cost||0)).toFixed(2)}</span>
+            </div>`).join('') + (ings.length > 5 ? `<div style="font-size:10px;color:var(--tan4);padding:4px 0">+${ings.length-5} more...</div>` : '')
+          : '<div style="font-size:12px;color:var(--tan4);padding:4px 0">No ingredients — กด Edit เพื่อเพิ่ม</div>'
+        }
+      </div>
+
+      <div class="rec-margin">
+        <span style="color:var(--tan3);font-size:11px">${r.price ? '฿'+r.price : 'no price'}</span>
+        <div class="rec-margin-bar">
+          <div class="rec-margin-fill ${barCls}" style="width:${barW}%"></div>
+        </div>
+        <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:${marginColor}">
+          ${marginPct !== null ? marginPct+'%' : '—'}
+        </span>
+      </div>
+
+      <div class="rec-actions">
+        <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="editRecipe('${r.id}')">Edit Recipe</button>
+        <button class="btn btn-red btn-sm btn-icon" onclick="deleteRecipe('${r.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterRecCat(f, el) {
+  _recCatFilter = f;
+  document.querySelectorAll('#vRecipes .filter-tabs .ftab').forEach(b => b.classList.remove('on'));
+  el.classList.add('on');
+  renderRecipes();
+}
+
+/* ── INGREDIENT EDITOR ──────────────────────────── */
+let _ingRows = []; // [{stock_item_id, qty}]
+
+function addIngRow(ing) {
+  const id = 'ing_' + Date.now() + Math.random().toString(36).slice(2,5);
+  const row = { id, stock_item_id: ing?.stock_item_id||'', qty: ing?.qty||'' };
+  _ingRows.push(row);
+  renderIngEditor();
+}
+
+function renderIngEditor() {
+  const el = ge('ingEditor');
+  if (!el) return;
+  el.innerHTML = _ingRows.map((row, idx) => {
+    const item = ITEMS.find(i => i.id === row.stock_item_id);
+    const costPerUnit = item ? Number(item.cost||0) : 0;
+    const lineCost = costPerUnit * Number(row.qty||0);
+    return `<div>
+      <div class="ing-row-edit">
+        <select class="inp" onchange="ingRowChange(${idx},'stock_item_id',this.value)">
+          <option value="">-- Select item --</option>
+          ${ITEMS.map(i => `<option value="${i.id}" ${i.id===row.stock_item_id?'selected':''}>${i.name} (${i.unit})</option>`).join('')}
+        </select>
+        <input type="number" class="inp" placeholder="qty" min="0.01" step="0.01" value="${row.qty}"
+               onchange="ingRowChange(${idx},'qty',this.value)" oninput="ingRowChange(${idx},'qty',this.value)">
+        <div style="font-size:10px;color:var(--tan4);text-align:center;padding:0 2px">${item?item.unit:''}</div>
+        <button class="ing-row-del" onclick="removeIngRow(${idx})">✕</button>
+      </div>
+      <div class="ing-cost-live">
+        ${item && row.qty ? `฿${Number(item.cost||0).toFixed(3)}/${item.unit} × ${row.qty} = ฿${lineCost.toFixed(3)}` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  calcRecipeCost();
+}
+
+function ingRowChange(idx, field, val) {
+  _ingRows[idx][field] = val;
+  // Sync qty back if needed
+  if (field === 'qty') _ingRows[idx].qty = val;
+  renderIngEditor();
+}
+
+function removeIngRow(idx) {
+  _ingRows.splice(idx, 1);
+  renderIngEditor();
+}
+
+function calcRecipeCost() {
+  const price = Number(ge('fr-price')?.value || 0);
+  const cogs  = _ingRows.reduce((s, row) => {
+    const item = ITEMS.find(i => i.id === row.stock_item_id);
+    return s + (item ? Number(item.cost||0) * Number(row.qty||0) : 0);
+  }, 0);
+  const margin = price > 0 ? ((price - cogs) / price) * 100 : null;
+  const barW   = margin !== null ? Math.min(100, Math.max(0, margin)) : 0;
+  const barColor = barW >= 60 ? 'var(--grn)' : barW >= 40 ? 'var(--ora)' : 'var(--red)';
+  const marginColor = barColor;
+
+  if (ge('fr-cogs'))       ge('fr-cogs').textContent      = '฿' + cogs.toFixed(2);
+  if (ge('fr-price-show')) ge('fr-price-show').textContent = '฿' + price.toFixed(2);
+  if (ge('fr-margin-bar')) { ge('fr-margin-bar').style.width = barW+'%'; ge('fr-margin-bar').style.background = barColor; }
+  if (ge('fr-margin'))     { ge('fr-margin').textContent = margin !== null ? margin.toFixed(1)+'%' : '—'; ge('fr-margin').style.color = marginColor; }
+}
+
+/* ── CRUD ───────────────────────────────────────── */
+function openAddRecipe() {
+  EDIT_REC_ID = null;
+  _ingRows = [];
+  ge('recOvTitle').textContent = 'Add Recipe';
+  ge('fr-name').value  = '';
+  ge('fr-price').value = '';
+  ge('fr-cat').value   = 'Tea';
+  renderIngEditor();
+  calcRecipeCost();
+  ge('recOv').classList.add('on');
+}
+
+function editRecipe(id) {
+  const r = RECIPES.find(x => x.id === id);
+  if (!r) return;
+  EDIT_REC_ID = id;
+  ge('recOvTitle').textContent = 'Edit: ' + r.name;
+  ge('fr-name').value  = r.name   || '';
+  ge('fr-price').value = r.price  || '';
+  ge('fr-cat').value   = r.cat    || 'Tea';
+  _ingRows = (r.ingredients || []).map((i, idx) => ({
+    id:            'ing_' + idx,
+    stock_item_id: i.stock_item_id,
+    qty:           i.qty,
+  }));
+  renderIngEditor();
+  calcRecipeCost();
+  ge('recOv').classList.add('on');
+}
+
+async function saveRecipe() {
+  const name  = ge('fr-name').value.trim();
+  const price = Number(ge('fr-price').value) || 0;
+  if (!name) { toast('กรุณากรอกชื่อเมนู', 'warn'); return; }
+
+  const ingredients = _ingRows
+    .filter(r => r.stock_item_id && r.qty)
+    .map(r => {
+      const item = ITEMS.find(i => i.id === r.stock_item_id);
+      return {
+        stock_item_id: r.stock_item_id,
+        name:      item?.name || '—',
+        qty:       Number(r.qty),
+        unit:      item?.unit || '',
+        unit_cost: Number(item?.cost || 0),
+      };
+    });
+
+  const data = { name, cat: ge('fr-cat').value, price, ingredients };
+
+  if (EDIT_REC_ID) {
+    if (SB_URL) {
+      try {
+        await SB.update('recipes', { name, cat:data.cat, price }, { id: EDIT_REC_ID });
+        await SB.del('recipe_ingredients', { recipe_id: EDIT_REC_ID });
+        if (ingredients.length) {
+          await Promise.all(ingredients.map(i => SB.insert('recipe_ingredients', {
+            recipe_id: EDIT_REC_ID, stock_item_id: i.stock_item_id,
+            qty: i.qty, unit: i.unit,
+          })));
+        }
+      } catch(e) { toast('Save error: '+e.message,'error'); return; }
+    }
+    const idx = RECIPES.findIndex(r => r.id === EDIT_REC_ID);
+    if (idx >= 0) RECIPES[idx] = { ...RECIPES[idx], ...data };
+    toast(name + ' updated', 'success');
+  } else {
+    if (SB_URL) {
+      try {
+        const res = await SB.insert('recipes', { name, cat:data.cat, price });
+        const newId = res[0]?.id;
+        data.id = newId;
+        if (newId && ingredients.length) {
+          await Promise.all(ingredients.map(i => SB.insert('recipe_ingredients', {
+            recipe_id: newId, stock_item_id: i.stock_item_id, qty: i.qty, unit: i.unit,
+          })));
+        }
+      } catch(e) { toast('Save error: '+e.message,'error'); return; }
+    }
+    RECIPES.push({ ...data, id: data.id || ('local_r_'+Date.now()) });
+    toast(name + ' added', 'success');
+  }
+  ge('nbRecipes').textContent = RECIPES.length;
+  closeOv('recOv');
+  renderRecipes();
+}
+
+async function deleteRecipe(id) {
+  const r = RECIPES.find(x => x.id === id);
+  if (!r || !confirm(`Delete recipe "${r.name}"?`)) return;
+  if (SB_URL) {
+    try {
+      await SB.del('recipe_ingredients', { recipe_id: id });
+      await SB.del('recipes', { id });
+    } catch(e) { toast('Delete error: '+e.message,'error'); return; }
+  }
+  RECIPES = RECIPES.filter(x => x.id !== id);
+  ge('nbRecipes').textContent = RECIPES.length;
+  renderRecipes();
+  toast(r.name + ' deleted');
+}
+
+/* ── PATCH loadData + showView ──────────────────── */
+const _origLoadDataS3a = loadData;
+loadData = async function() {
+  await _origLoadDataS3a();
+  await loadRecipes();
+};
+const _origShowViewS3a = showView;
+showView = function(id, el) {
+  _origShowViewS3a(id, el);
+  if (id === 'vRecipes') renderRecipes();
+};
+
+/* ══════════════════════════════════════════════════
+   S2b — RECEIVE LINKED TO SUPPLIER + COST UPDATE
+   ══════════════════════════════════════════════════ */
+
+/* ── POPULATE SUPPLIER SELECT ───────────────────── */
+function populateSupplierSelect() {
+  const sel = ge('adj-supplier');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">-- Select supplier --</option>' +
+    SUPPLIERS.filter(s => s.status === 'active')
+      .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+  // Also populate receive history filter
+  const rhSel = ge('rhSupFilter');
+  if (rhSel) {
+    rhSel.innerHTML = '<option value="">All Suppliers</option>' +
+      SUPPLIERS.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  }
+}
+
+/* ── ON SUPPLIER CHANGE: auto-fill lead time hint ── */
+function onSupplierChange() {
+  const supId = ge('adj-supplier')?.value;
+  const sup = SUPPLIERS.find(s => s.id === supId);
+  if (sup?.lead_time) {
+    const expected = new Date();
+    expected.setDate(expected.getDate() + Number(sup.lead_time));
+    // Could show expected delivery — optional hint
+  }
+}
+
+/* ── ON ITEM CHANGE: auto-fill last cost + show history ── */
+function onAdjItemChange() {
+  const itemId = ge('adj-item').value;
+  const item = ITEMS.find(i => i.id === itemId);
+  updateAdjPreview();
+  if (!item) { ge('adj-history').style.display = 'none'; return; }
+
+  // Auto-fill last known cost
+  if (item.cost && ADJ_TYPE === 'receive') {
+    ge('adj-cost').value = item.cost;
+    const hint = ge('adj-cost-hint');
+    if (hint) hint.textContent = `(last: ฿${item.cost})`;
+  }
+
+  // Show recent receive history for this item
+  const hist = TX.filter(t => t.item_id === itemId && t.type === 'receive').slice(0, 4);
+  const histEl = ge('adj-history');
+  const histRows = ge('adj-history-rows');
+  if (!hist.length || ADJ_TYPE !== 'receive') { histEl.style.display = 'none'; return; }
+  histEl.style.display = 'block';
+  histRows.innerHTML = hist.map(t => {
+    const supName = SUPPLIERS.find(s => s.id === t.supplier_id)?.name || t.supplier_name || '—';
+    const cost = t.unit_cost ? `฿${Number(t.unit_cost).toFixed(2)}/${item.unit}` : '—';
+    return `<div class="rh-row">
+      <span class="rh-sup">${supName}</span>
+      <span class="rh-qty">+${fmtN(Math.abs(t.qty),1)}</span>
+      <span class="rh-cost">${cost}</span>
+      <span class="rh-meta">${timeAgo(t.created_at)}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ── UPGRADE updateAdjPreview to show total cost ─── */
+const _origUpdateAdjPreview = updateAdjPreview;
+updateAdjPreview = function() {
+  _origUpdateAdjPreview();
+  const item = ITEMS.find(i => i.id === ge('adj-item').value);
+  const qty  = Number(ge('adj-qty').value) || 0;
+  const cost = Number(ge('adj-cost').value) || 0;
+  const totalCostEl = ge('adj-total-cost');
+  if (totalCostEl && item && qty && cost && ADJ_TYPE === 'receive') {
+    const total = qty * cost;
+    totalCostEl.textContent = `Total: ฿${total.toFixed(2)}`;
+  } else if (totalCostEl) {
+    totalCostEl.textContent = '';
+  }
+};
+
+/* ── UPGRADE setAdjType to show/hide supplier row ── */
+const _origSetAdjType = setAdjType;
+setAdjType = function(type) {
+  _origSetAdjType(type);
+  const supRow = ge('adj-sup-row');
+  const histEl = ge('adj-history');
+  if (supRow) supRow.style.display = type === 'receive' ? 'block' : 'none';
+  if (histEl && type !== 'receive') histEl.style.display = 'none';
+  const hint = ge('adj-cost-hint');
+  if (hint && type !== 'receive') hint.textContent = '';
+  // Re-run item change handler for history visibility
+  if (type === 'receive') onAdjItemChange();
+};
+
+/* ── UPGRADE saveAdj to include supplier + invoice + auto-update cost ── */
+const _origSaveAdj = saveAdj;
+saveAdj = async function() {
+  // Capture supplier before original saves
+  const supId     = ge('adj-supplier')?.value || null;
+  const invoiceNo = ge('adj-invoice')?.value.trim() || null;
+  const costVal   = Number(ge('adj-cost').value) || 0;
+  const itemId    = ge('adj-item').value;
+
+  await _origSaveAdj();   // runs original save logic
+
+  // Update transaction with supplier info
+  if (TX.length && ADJ_TYPE === 'receive') {
+    const lastTx = TX[0];
+    if (lastTx) {
+      lastTx.supplier_id   = supId;
+      lastTx.supplier_name = SUPPLIERS.find(s => s.id === supId)?.name || null;
+      lastTx.invoice_no    = invoiceNo;
+      lastTx.unit_cost     = costVal || null;
+    }
+    // Auto-update supplier total_spent
+    if (supId) {
+      const qty   = Number(ge('adj-qty')?.value) || 0;
+      const total = qty * costVal;
+      const sup   = SUPPLIERS.find(s => s.id === supId);
+      if (sup) {
+        sup.orders       = (sup.orders || 0) + 1;
+        sup.total_spent  = (sup.total_spent || 0) + total;
+        if (SB_URL && sup.id) {
+          SB.update('suppliers', { orders: sup.orders, total_spent: sup.total_spent }, { id: sup.id }).catch(() => {});
+        }
+      }
+    }
+    // Persist invoice to Supabase tx record
+    if (SB_URL && TX[0]?.id && !TX[0].id.startsWith('local_')) {
+      SB.update('stock_transactions', {
+        supplier_id: supId, invoice_no: invoiceNo, unit_cost: costVal || null,
+      }, { id: TX[0].id }).catch(() => {});
+    }
+  }
+  // Reset supplier fields
+  if (ge('adj-supplier')) ge('adj-supplier').value = '';
+  if (ge('adj-invoice'))  ge('adj-invoice').value  = '';
+  if (ge('adj-history'))  ge('adj-history').style.display = 'none';
+};
+
+/* ── UPGRADE openAdjModal to populate suppliers ─── */
+const _origOpenAdjModal = openAdjModal;
+openAdjModal = function(type, itemId) {
+  _origOpenAdjModal(type, itemId);
+  populateSupplierSelect();
+  const supRow = ge('adj-sup-row');
+  if (supRow) supRow.style.display = (type || 'receive') === 'receive' ? 'block' : 'none';
+  if (ge('adj-supplier')) ge('adj-supplier').value = '';
+  if (ge('adj-invoice'))  ge('adj-invoice').value  = '';
+  if (ge('adj-history'))  ge('adj-history').style.display = 'none';
+  ge('adjOvTitle').textContent = type === 'receive' ? 'Receive Stock' : 'Stock Movement';
+};
+
+/* ── RECEIVE HISTORY VIEW ───────────────────────── */
+function renderReceiveHistory() {
+  const q     = (ge('rhSearch')?.value || '').toLowerCase();
+  const supId = ge('rhSupFilter')?.value || '';
+  const list  = TX.filter(t => t.type === 'receive'
+    && (!supId || t.supplier_id === supId)
+    && (!q || (t.item_name||'').toLowerCase().includes(q) || (t.supplier_name||'').toLowerCase().includes(q))
+  );
+
+  const tbody = ge('rhTbody');
+  const empty = ge('rhEmpty');
+  if (!list.length) { tbody.innerHTML = ''; empty.style.display = 'flex'; return; }
+  empty.style.display = 'none';
+
+  // Summary stats (this month)
+  const now = new Date(); const thisMonth = now.getMonth(); const thisYear = now.getFullYear();
+  const monthly = list.filter(t => { const d = new Date(t.created_at); return d.getMonth()===thisMonth && d.getFullYear()===thisYear; });
+  const totalCost = monthly.reduce((s,t) => s + (Math.abs(t.qty) * (t.unit_cost||0)), 0);
+  const uniqueItems = new Set(monthly.map(t => t.item_id)).size;
+  ge('rh-count').textContent = monthly.length;
+  ge('rh-cost').textContent  = '฿' + totalCost.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  ge('rh-items').textContent = uniqueItems;
+
+  tbody.innerHTML = list.map(t => {
+    const item    = ITEMS.find(i => i.id === t.item_id);
+    const supName = SUPPLIERS.find(s => s.id === t.supplier_id)?.name || t.supplier_name || '—';
+    const qty     = Math.abs(Number(t.qty || 0));
+    const uc      = Number(t.unit_cost || 0);
+    const total   = qty * uc;
+    return `<tr>
+      <td style="font-size:11px;color:var(--tan3);white-space:nowrap">${fmtDate(t.created_at)}</td>
+      <td style="font-weight:600;color:var(--tan)">${t.item_name || '—'}</td>
+      <td>
+        ${supName !== '—'
+          ? `<span style="background:var(--c3);border:1px solid var(--ln2);border-radius:5px;padding:2px 7px;font-size:11px;color:var(--tan2)">${supName}</span>`
+          : `<span style="color:var(--tan4);font-size:11px">—</span>`}
+      </td>
+      <td style="font-size:11px;color:var(--tan3);font-family:var(--mono)">${t.invoice_no || '—'}</td>
+      <td style="font-family:var(--mono);color:var(--grn);font-weight:700">+${fmtN(qty,1)} <span style="color:var(--tan4);font-size:11px;font-weight:400">${item?.unit||''}</span></td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--tan3)">${uc ? fmt(uc) : '—'}</td>
+      <td style="font-family:var(--mono);font-weight:600;color:var(--gl)">${total ? fmt(total) : '—'}</td>
+      <td style="font-size:11px;color:var(--tan4)">${t.staff_name || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── PATCH showView for receive history ─────────── */
+const _origShowViewS2b = showView;
+showView = function(id, el) {
+  _origShowViewS2b(id, el);
+  if (id === 'vReceive') { populateSupplierSelect(); renderReceiveHistory(); }
+};
+
+/* ══════════════════════════════════════════════════
+   S2a — SUPPLIER MASTER
+   ══════════════════════════════════════════════════ */
+let SUPPLIERS = [];
+let EDIT_SUP_ID = null;
+let _supFilter = 'all';
+
+/* ── MOCK DATA ──────────────────────────────────── */
+function loadMockSuppliers() {
+  SUPPLIERS = [
+    { id:'s1', name:'ชาไทย Trading',    phone:'081-234-5678', line:'chathai_bkk', email:'order@chathai.co.th', cat:'Tea',       terms:'Net15', lead_time:2, min_order:500,  status:'active', note:'ส่งทุกวันอังคาร-ศุกร์', tax_id:'0105555001234', orders:12, total_spent:24800, created_at:'2024-01-15T10:00:00Z' },
+    { id:'s2', name:'Dairy Fresh Co.',   phone:'02-888-1234',  line:'dairyfresh',  email:'sales@dairyfresh.th', cat:'Milk',      terms:'COD',   lead_time:1, min_order:800,  status:'active', note:'รับสั่งก่อน 16:00',    tax_id:'',             orders:28, total_spent:38400, created_at:'2024-01-10T09:00:00Z' },
+    { id:'s3', name:'SweetSyrup Import', phone:'080-999-7777', line:'sweetsyrup',  email:'',                    cat:'Syrup',     terms:'Net7',  lead_time:3, min_order:1200, status:'active', note:'MOQ 12 bottles/order', tax_id:'0105555005678', orders:6,  total_spent:12600, created_at:'2024-02-01T08:00:00Z' },
+    { id:'s4', name:'Pack Pro Thailand', phone:'02-333-4444',  line:'',            email:'info@packpro.co.th',  cat:'Packaging', terms:'Net30', lead_time:5, min_order:2000, status:'paused', note:'ปิดปรับปรุง มี.ค.',    tax_id:'0105555009999', orders:3,  total_spent:8900,  created_at:'2024-03-01T11:00:00Z' },
+  ];
+}
+
+/* ── LOAD ───────────────────────────────────────── */
+async function loadSuppliers() {
+  if (SB_URL && SB_KEY) {
+    try {
+      SUPPLIERS = await SB.q('suppliers', { select: '*', order: 'name' });
+    } catch(e) {
+      console.warn('[suppliers] fallback to mock:', e.message);
+      loadMockSuppliers();
+    }
+  } else {
+    loadMockSuppliers();
+  }
+  ge('nbSuppliers').textContent = SUPPLIERS.length;
+  renderSuppliers();
+}
+
+/* ── RENDER ─────────────────────────────────────── */
+function renderSuppliers() {
+  const q = (ge('supSearch')?.value || '').toLowerCase();
+  const list = SUPPLIERS.filter(s => {
+    const matchF = _supFilter === 'all' || s.status === _supFilter;
+    const matchQ = !q || s.name.toLowerCase().includes(q) || (s.phone||'').includes(q) || (s.cat||'').toLowerCase().includes(q);
+    return matchF && matchQ;
+  });
+
+  const grid  = ge('supGrid');
+  const empty = ge('supEmpty');
+
+  if (!list.length) { grid.innerHTML = ''; empty.style.display = 'flex'; return; }
+  empty.style.display = 'none';
+
+  const statusColors = { active: 'var(--grn)', paused: 'var(--tan3)' };
+  const termColors   = { COD:'var(--ora)', Net7:'var(--blu)', Net15:'var(--blu)', Net30:'var(--red)', Monthly:'var(--tan3)' };
+
+  grid.innerHTML = list.map(s => `
+    <div class="sup-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div>
+          <div class="sup-name">${s.name}</div>
+          <div style="font-size:11px;color:var(--tan3);margin-top:2px">${s.cat} · ${s.tax_id||'no tax ID'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          <span style="font-size:10px;font-weight:700;color:${statusColors[s.status]||'var(--tan3)'};text-transform:uppercase;letter-spacing:.5px">${s.status}</span>
+          <span style="font-size:10px;background:var(--c3);border:1px solid var(--ln2);border-radius:4px;padding:1px 6px;color:${termColors[s.terms]||'var(--tan3)'};">${s.terms}</span>
+        </div>
+      </div>
+
+      ${s.phone ? `<div class="sup-contact"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.08 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.09a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 15z"/></svg>${s.phone}</div>` : ''}
+      ${s.email ? `<div class="sup-contact"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>${s.email}</div>` : ''}
+
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        ${s.lead_time ? `<span class="sup-chip">⏱ ${s.lead_time}d lead</span>` : ''}
+        ${s.min_order ? `<span class="sup-chip">MOQ ฿${s.min_order.toLocaleString()}</span>` : ''}
+        ${s.line ? `<span class="sup-chip">LINE: ${s.line}</span>` : ''}
+      </div>
+
+      <div class="sup-stat-row">
+        <div class="sup-stat">
+          <div class="sup-stat-val">${s.orders||0}</div>
+          <div class="sup-stat-lbl">Orders</div>
+        </div>
+        <div class="sup-stat">
+          <div class="sup-stat-val">฿${(s.total_spent||0).toLocaleString()}</div>
+          <div class="sup-stat-lbl">Total Spent</div>
+        </div>
+        <div class="sup-stat">
+          <div class="sup-stat-val">${s.lead_time||'—'}</div>
+          <div class="sup-stat-lbl">Days Lead</div>
+        </div>
+      </div>
+
+      ${s.note ? `<div style="font-size:11px;color:var(--tan4);margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-style:italic">${s.note}</div>` : ''}
+
+      <div class="sup-actions">
+        <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="editSupplier('${s.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="callSupplier('${s.id}')">📞 Call</button>
+        <button class="btn btn-red btn-sm btn-icon" onclick="deleteSupplier('${s.id}')" title="Delete">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function filterSup(f, el) {
+  _supFilter = f;
+  document.querySelectorAll('#vSuppliers .filter-tabs .ftab').forEach(b => b.classList.remove('on'));
+  el.classList.add('on');
+  renderSuppliers();
+}
+
+/* ── CRUD ───────────────────────────────────────── */
+function openAddSupplier() {
+  EDIT_SUP_ID = null;
+  ge('supOvTitle').textContent = 'Add Supplier';
+  ['fs-name','fs-phone','fs-line','fs-email','fs-note','fs-tax'].forEach(id => ge(id).value = '');
+  ge('fs-cat').value    = 'Tea';
+  ge('fs-terms').value  = 'COD';
+  ge('fs-lead').value   = '1';
+  ge('fs-moo').value    = '';
+  ge('fs-status').value = 'active';
+  ge('supOv').classList.add('on');
+}
+
+function editSupplier(id) {
+  const s = SUPPLIERS.find(x => x.id === id);
+  if (!s) return;
+  EDIT_SUP_ID = id;
+  ge('supOvTitle').textContent = 'Edit: ' + s.name;
+  ge('fs-name').value   = s.name    || '';
+  ge('fs-phone').value  = s.phone   || '';
+  ge('fs-line').value   = s.line    || '';
+  ge('fs-email').value  = s.email   || '';
+  ge('fs-cat').value    = s.cat     || 'Tea';
+  ge('fs-terms').value  = s.terms   || 'COD';
+  ge('fs-lead').value   = s.lead_time ?? '';
+  ge('fs-moo').value    = s.min_order ?? '';
+  ge('fs-status').value = s.status  || 'active';
+  ge('fs-note').value   = s.note    || '';
+  ge('fs-tax').value    = s.tax_id  || '';
+  ge('supOv').classList.add('on');
+}
+
+async function saveSupplier() {
+  const name = ge('fs-name').value.trim();
+  if (!name) { toast('กรุณากรอกชื่อ supplier', 'warn'); return; }
+
+  const data = {
+    name,
+    phone:      ge('fs-phone').value.trim() || null,
+    line:       ge('fs-line').value.trim()  || null,
+    email:      ge('fs-email').value.trim() || null,
+    cat:        ge('fs-cat').value,
+    terms:      ge('fs-terms').value,
+    lead_time:  Number(ge('fs-lead').value) || null,
+    min_order:  Number(ge('fs-moo').value)  || null,
+    status:     ge('fs-status').value,
+    note:       ge('fs-note').value.trim()  || null,
+    tax_id:     ge('fs-tax').value.trim()   || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (EDIT_SUP_ID) {
+    if (SB_URL) {
+      try { await SB.update('suppliers', data, { id: EDIT_SUP_ID }); }
+      catch(e) { toast('Save error: ' + e.message, 'error'); return; }
+    }
+    const idx = SUPPLIERS.findIndex(s => s.id === EDIT_SUP_ID);
+    if (idx >= 0) SUPPLIERS[idx] = { ...SUPPLIERS[idx], ...data };
+    toast(name + ' updated', 'success');
+  } else {
+    if (SB_URL) {
+      try {
+        const res = await SB.insert('suppliers', data);
+        data.id = res[0]?.id;
+      } catch(e) { toast('Save error: ' + e.message, 'error'); return; }
+    }
+    SUPPLIERS.push({ ...data, id: data.id || ('local_' + Date.now()), orders: 0, total_spent: 0 });
+    toast(name + ' added', 'success');
+  }
+  ge('nbSuppliers').textContent = SUPPLIERS.length;
+  closeOv('supOv');
+  renderSuppliers();
+}
+
+async function deleteSupplier(id) {
+  const s = SUPPLIERS.find(x => x.id === id);
+  if (!s || !confirm(`Delete "${s.name}"?`)) return;
+  if (SB_URL) {
+    try { await SB.del('suppliers', { id }); }
+    catch(e) { toast('Delete error: ' + e.message, 'error'); return; }
+  }
+  SUPPLIERS = SUPPLIERS.filter(x => x.id !== id);
+  ge('nbSuppliers').textContent = SUPPLIERS.length;
+  renderSuppliers();
+  toast(s.name + ' removed');
+}
+
+function callSupplier(id) {
+  const s = SUPPLIERS.find(x => x.id === id);
+  if (!s?.phone) { toast('ไม่มีเบอร์โทร', 'warn'); return; }
+  window.location.href = 'tel:' + s.phone.replace(/\D/g,'');
+}
+
+/* ── PATCH loadData to also load suppliers ──────── */
+const _origLoadData = loadData;
+loadData = async function() {
+  await _origLoadData();
+  await loadSuppliers();
+};
+
+/* ── PATCH showView ─────────────────────────────── */
+const _origShowView = showView;
+showView = function(id, el) {
+  _origShowView(id, el);
+  if (id === 'vSuppliers') renderSuppliers();
+};
+
+/* ── INIT ───────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>
