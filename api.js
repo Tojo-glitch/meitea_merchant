@@ -318,49 +318,63 @@ async signUp(params) {
     },
 
 async register({ phone, email, name, hashedPassword }) {
-  try {
-    const pseudo = String(phone).trim() + '@ceramic.app';
+      try {
+        // 1. ใช้อีเมลจริงๆ ที่ลูกค้ากรอก (เลิกใช้ @ceramic.app)
+        const realEmail = String(email).trim().toLowerCase();
 
-    const signUpParams = {
-      email: pseudo,
-      password: String(hashedPassword),   // ส่ง password ตรงนี้
-      data: {
-        name: String(name),
-        phone: String(phone)
+        const signUpParams = {
+          email: realEmail,
+          password: String(hashedPassword),
+          data: {
+            name: String(name),
+            phone: String(phone)
+          }
+        };
+
+        console.log('[DEBUG signUpParams]', signUpParams);
+
+        // 2. ยิงคำสั่งสมัครสมาชิกไปที่ Supabase Auth
+        const auth = await sb.signUp(signUpParams);
+
+        if (auth.error) {
+          if (auth.error.code === 'user_already_exists' || auth.error.message?.includes('already registered')) {
+            return fail('อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบ');
+          }
+          return fail(auth.error.message || 'Registration failed.');
+        }
+
+        const authId = auth?.user?.id || auth?.id || auth?.data?.user?.id;
+        if (!authId) {
+          return fail('Registration failed – unable to retrieve user ID.');
+        }
+
+        // 3. บันทึกข้อมูลลงตาราง members ของเรา
+        await sb.insert('members', {
+          auth_id: authId,
+          phone: String(phone),
+          email: realEmail,
+          name: String(name),
+          points: 50,
+          tier: 'Bronze',
+          is_active: true
+        });
+
+        // 4. ส่งข้อมูล User กลับไปให้หน้าเว็บใช้งานต่อทันที
+        return success({ 
+          user: { 
+            id: authId, 
+            name: String(name), 
+            phone: String(phone), 
+            email: realEmail, 
+            points: 50, 
+            tier: 'Bronze' 
+          } 
+        });
+
+      } catch (e) {
+        return fail(e.message);
       }
-    };
-
-    console.log('[DEBUG signUpParams]', signUpParams);   // ดูค่าก่อนส่ง
-
-    const auth = await sb.signUp(signUpParams);
-
-    if (auth.error) {
-      if (auth.error.code === 'user_already_exists' ||
-          auth.error.message?.includes('already registered')) {
-        return fail('This phone number already has an account. Please log in.');
-      }
-      return fail(auth.error.message || 'Registration failed.');
-    }
-
-    const authId = auth?.user?.id || auth?.id || auth?.data?.user?.id;
-    if (!authId) {
-      return fail('Registration failed – unable to retrieve user ID.');
-    }
-
-    await sb.insert('members', {
-      auth_id: authId,
-      phone: String(phone),
-      email: String(email),
-      name: String(name),
-      points: 50,
-      tier: 'Bronze'
-    });
-
-    return success();
-  } catch (e) {
-    return fail(e.message);
-  }
-},
+    },
     async logout() {
       try {
         const token = storage.getRaw('ctb_token');
