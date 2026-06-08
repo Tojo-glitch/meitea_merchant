@@ -3228,82 +3228,61 @@ function openInviteModal() {
  * ปรับปรุงโดยใช้ sbClient ให้ตรงตามโครงสร้างโปรเจกต์ของคุณ
  */
 async function generateInvite() {
-  // 1. ดึง Element จากหน้าต่าง Modal
   const branchSelect = document.getElementById('is-branch');
   const roleSelect = document.getElementById('is-role');
-  const createBtn = document.getElementById('btn-create-invite');
-  const linkArea = document.getElementById('invite-link-area');
-  const linkInput = document.getElementById('invite-link-url');
+  const btn = document.getElementById('btn-create-invite');
+  const area = document.getElementById('invite-link-area');
+  const inp = document.getElementById('invite-link-url');
 
-  if (!branchSelect || !roleSelect || !createBtn || !linkArea || !linkInput) {
-    console.error('[Invite Error] ไม่พบ DOM elements ที่จำเป็นในหน้านี้');
-    return;
-  }
-
-  const branchId = branchSelect.value ? branchSelect.value.trim() : '';
-  const role = roleSelect.value ? roleSelect.value.trim() : 'STAFF';
-
-  // ตรวจสอบว่าเลือกสาขาหรือยัง
-  if (!branchId) {
+  if (!branchSelect || !branchSelect.value) {
     alert('กรุณาเลือกสาขาก่อนสร้างลิงก์เชิญ');
-    branchSelect.focus();
     return;
   }
+
+  btn.textContent = 'กำลังสร้างลิงก์...';
+  btn.disabled = true;
+
+  const token = crypto.randomUUID();
+  const branchId = branchSelect.value;
+  const role = roleSelect.value;
 
   try {
-    // เปลี่ยนสถานะปุ่มกดเพื่อป้องกันการกดเบิ้ล
-    createBtn.disabled = true;
-    createBtn.innerText = 'กำลังสร้างลิงก์...';
+    // ส่งข้อมูลบันทึกเข้า Supabase ผ่าน sbClient ของคุณ
+    if (typeof sbClient !== 'undefined') {
+      const { error } = await sbClient
+        .from('staff_invites')
+        .insert([
+          { 
+            token: token, 
+            branch_id: branchId, 
+            role: role, 
+            status: 'PENDING',
+            created_at: new Date().toISOString()
+          }
+        ]);
 
-    // สร้าง Secure UUID Token สำหรับพนักงาน
-    const inviteToken = crypto.randomUUID(); 
-    
-    // ตรวจสอบความพร้อมของตัวแปรเชื่อมต่อ Supabase
-    if (typeof sbClient === 'undefined') {
-      throw new Error('ระบบยังไม่ได้เชื่อมต่อกับ Supabase หรือ sbClient ไม่พร้อมใช้งาน');
+      if (error) throw error;
+    } else {
+      console.warn('sbClient is not defined. Skipping database insert.');
     }
 
-    // 2. บันทึกข้อมูลเข้าสู่ตาราง staff_invites โดยใช้ sbClient (แก้ไขบั๊ก)
-    const { data, error } = await sbClient
-      .from('staff_invites') 
-      .insert([
-        { 
-          token: inviteToken, 
-          branch_id: branchId, 
-          role: role, 
-          status: 'PENDING',
-          created_at: new Date().toISOString()
-        }
-      ])
-      .select();
-
-    if (error) throw error;
-
-    // 3. สร้าง URL สำหรับหน้า Onboarding ของพนักงาน
-    // ระบบจะสร้างลิงก์ตามโดเมนปัจจุบันที่คุณเปิดใช้งานอยู่โดยอัตโนมัติ
-    const onboardingUrl = `${window.location.origin}/staff-register.html?token=${inviteToken}`;
+    // ✨ [แก้ไขบั๊ก!] เปลี่ยนวิธีสร้างลิงก์ให้ดึงจาก URL ปัจจุบันที่กำลังเปิดใช้งานอยู่จริง
+    const currentOrigin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+    const inviteLink = `${currentOrigin}/staff-register.html?token=${token}`;
     
-    // แสดงกล่องข้อความและนำลิงก์ไปหยอดลงใน Input เพื่อให้แอดมินพร้อมคัดลอก
-    linkInput.value = onboardingUrl;
-    linkArea.style.display = 'block';
+    inp.value = inviteLink;
+    area.style.display = 'block';
     
-    alert('สร้างลิงก์เชิญสำเร็จแล้ว!');
-
-    // โหลดตารางรอกรอกประวัติ (Pending Table) ใหม่ทันทีหลังสร้าง
-    if (typeof fetchPendingInvites === 'function') {
-      fetchPendingInvites();
-    }
-
-  } catch (error) {
-    console.error('[Supabase Invite Error Detail]:', error);
-    alert(`เกิดข้อผิดพลาด: ${error.message || 'เน็ตเวิร์กขัดข้อง'}`);
+    alert('สร้างลิงก์เชิญพนักงานเรียบร้อยแล้ว!');
+    
+  } catch (err) {
+    console.error('Database error:', err);
+    alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + err.message);
   } finally {
-    // คืนสภาพปุ่มให้แอดมินใช้งานต่อได้
-    createBtn.disabled = false;
-    createBtn.innerText = 'Generate Invite Link';
+    btn.textContent = 'Generate Invite Link';
+    btn.disabled = false;
   }
 }
-
 /**
  * ฟังก์ชันแชร์ลิงก์หรือคัดลอกตั๋วเชิญไปยังอุปกรณ์ปลายทาง
  */
