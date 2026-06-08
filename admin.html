@@ -2490,11 +2490,7 @@ async function toggleMember(id,currentActive){
 /* ══════════════════════════════════════════════════════
    STAFF MANAGEMENT
 ══════════════════════════════════════════════════════ */
-const MOCK_STAFF = [
-  {id:'s1',name:'Khun Nong',username:'nong_siam',role:'MANAGER',branch_id:'BR001',branch_name:'Main Branch — Siam',is_active:true,created_at:new Date(Date.now()-86400000*90).toISOString()},
-  {id:'s2',name:'Khun Arm',username:'arm_siam',role:'STAFF',branch_id:'BR001',branch_name:'Main Branch — Siam',is_active:true,created_at:new Date(Date.now()-86400000*60).toISOString()},
-  {id:'s3',name:'Khun Mint',username:'mint_tgl',role:'STAFF',branch_id:'BR002',branch_name:'Thonglor Branch',is_active:false,created_at:new Date(Date.now()-86400000*30).toISOString()},
-];
+
 const PENDING_INVITES = [];
 let A_staff = [];
 let A_editStaffId = null;
@@ -2545,36 +2541,57 @@ function filterStaff(){
   renderStaffGrid(list);
 }
 
-function renderStaffGrid(list){
-  const el=ge('staff-grid');
-  if(!list.length){el.innerHTML='<div style="color:var(--tan3);font-size:13px">No staff found</div>';return}
-  const roleCls={ADMIN:'role-admin',MANAGER:'role-manager',STAFF:'role-staff'};
-  const avCls={ADMIN:'',MANAGER:'mgr',STAFF:''};
-  el.innerHTML=list.map(s=>`
-    <div class="staff-card ${s.is_active===false?'suspended':''}">
-      <div class="sc-head" style="cursor:pointer" onclick="openStaffDetail('${esc(s.id)}')">
-        <div class="sc-av ${avCls[s.role]||''} ${s.is_active===false?'susp':''}">${(s.name||'?')[0].toUpperCase()}</div>
-        <div style="flex:1">
-          <div class="sc-name">${esc(s.name)}</div>
+function renderStaff() {
+  // 1. ชี้เป้าไปที่พื้นที่แสดงการ์ดพนักงานในหน้า HTML
+  const grid = document.querySelector('.staff-grid');
+  if (!grid) return;
+
+  // 2. ล้างข้อมูลพนักงาน Mock (คุณหน่อง, คุณอาร์ม, คุณมิ้นท์) ออกไปให้หมดเกลี้ยง!
+  grid.innerHTML = '';
+
+  // 3. ตรวจสอบว่าในตัวแปรระบบมีข้อมูลพนักงานจริงที่ดึงมาจาก Supabase ไหม
+  if (!A.staff || A.staff.length === 0) {
+    grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--tan3);">
+                        ยังไม่มีข้อมูลพนักงานในฐานข้อมูลระบบ
+                      </div>`;
+    return;
+  }
+
+  // 4. วนลูปวาดการ์ดพนักงานตัวจริงจากข้อมูลใน Supabase
+  A.staff.forEach(item => {
+    // แยกอักษรย่อสำหรับทำรูปโปรไฟล์ (Avatar) เช่น Khun Nong -> KN
+    const avTxt = item.name ? item.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'ST';
+    
+    // ตั้งสีแยกตามระดับ Role
+    let roleClass = 'role-staff';
+    if(item.role === 'ADMIN') roleClass = 'role-admin';
+    if(item.role === 'MANAGER') roleClass = 'role-manager';
+
+    const card = document.createElement('div');
+    card.className = `staff-card ${item.status === 'SUSPENDED' ? 'suspended' : ''}`;
+    card.innerHTML = `
+      <div class="sc-head">
+        <div class="sc-av ${item.role === 'MANAGER' ? 'mgr' : ''} ${item.status === 'SUSPENDED' ? 'susp' : ''}">${avTxt}</div>
+        <div>
+          <div class="sc-name">${item.name || 'Unknown Staff'}</div>
           <div class="sc-meta">
-            <span class="role-badge ${roleCls[s.role]||'role-staff'}">${s.role}</span>
-            ${s.is_active===false?'<span style="font-size:10px;color:var(--red)">Suspended</span>':''}
+            <span class="role-badge ${roleClass}">${item.role || 'STAFF'}</span>
+            <span class="status-pill ${item.status === 'ACTIVE' ? 'active' : 'pending'}">${item.status || 'PENDING'}</span>
           </div>
         </div>
       </div>
-      <div class="sc-branch">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-        ${esc(s.branch_name||'—')}
-      </div>
       <div class="sc-foot">
-        <div style="font-size:10px;color:var(--tan3);flex:1">Since ${s.created_at?new Date(s.created_at).toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—'}</div>
-        <button class="btn btn-ghost btn-sm" onclick="openStaffDetail('${esc(s.id)}')">Stats</button>
-        <button class="btn btn-ghost btn-sm" onclick="openEditStaff('${esc(s.id)}')">Edit</button>
-        <button class="btn ${s.is_active===false?'btn-grn':'btn-red'} btn-sm" onclick="toggleStaff('${esc(s.id)}',${s.is_active!==false})">
-          ${s.is_active===false?'Restore':'Suspend'}
+        <div class="sc-branch">
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-4a1 1 0 011-1h2a1 1 0 011 1v4"></path></svg>
+          สาขา: ${item.branch_id || 'ไม่ได้ระบุ'}
+        </div>
+        <button class="btn-sm-line" onclick="toggleStaffStatus('${item.id}', '${item.status}')">
+          ${item.status === 'SUSPENDED' ? 'เปิดใช้งาน' : 'ระงับสิทธิ์'}
         </button>
       </div>
-    </div>`).join('');
+    `;
+    grid.appendChild(card);
+  });
 }
 
 async function openEditStaff(id){
