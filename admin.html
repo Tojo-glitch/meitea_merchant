@@ -3206,46 +3206,48 @@ function openInviteModal() {
  * ฟังก์ชันสร้างตั๋วเชิญพนักงานใหม่ (Staff Invitation) และบันทึกลง Supabase
  * รองรับการกำหนดสาขา (Branch) และสิทธิ์การใช้งาน (Role)
  */
+/**
+ * ฟังก์ชันสร้างตั๋วเชิญพนักงานใหม่ (Staff Invitation) และบันทึกลง Supabase
+ * ปรับปรุงโดยใช้ sbClient ให้ตรงตามโครงสร้างโปรเจกต์ของคุณ
+ */
 async function generateInvite() {
-  // 1. ดึง Element จาก DOM เพื่อเตรียมใช้งาน
+  // 1. ดึง Element จากหน้าต่าง Modal
   const branchSelect = document.getElementById('is-branch');
   const roleSelect = document.getElementById('is-role');
   const createBtn = document.getElementById('btn-create-invite');
   const linkArea = document.getElementById('invite-link-area');
   const linkInput = document.getElementById('invite-link-url');
 
-  // ตรวจสอบความพร้อมของ DOM Elements เพื่อป้องกัน Uncaught TypeError
   if (!branchSelect || !roleSelect || !createBtn || !linkArea || !linkInput) {
-    console.error('[Invite Error] Required DOM elements are missing.');
+    console.error('[Invite Error] ไม่พบ DOM elements ที่จำเป็นในหน้านี้');
     return;
   }
 
   const branchId = branchSelect.value ? branchSelect.value.trim() : '';
   const role = roleSelect.value ? roleSelect.value.trim() : 'STAFF';
 
-  // 2. Validation: ตรวจสอบข้อมูลก่อนส่งขึนเซิร์ฟเวอร์
+  // ตรวจสอบว่าเลือกสาขาหรือยัง
   if (!branchId) {
-    if (typeof showToast === 'function') {
-      showToast('กรุณาเลือกสาขาก่อนสร้างลิงก์เชิญ', 'warning');
-    } else {
-      alert('กรุณาเลือกสาขาก่อนสร้างลิงก์เชิญ');
-    }
+    alert('กรุณาเลือกสาขาก่อนสร้างลิงก์เชิญ');
     branchSelect.focus();
     return;
   }
 
   try {
-    // 3. UI Loading State: เปิดสถานะกำลังโหลด ป้องกันการส่งคำขอซ้ำ (Idempotency)
+    // เปลี่ยนสถานะปุ่มกดเพื่อป้องกันการกดเบิ้ล
     createBtn.disabled = true;
-    const originalBtnText = createBtn.innerText;
-    createBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>กำลังสร้างลิงก์...';
+    createBtn.innerText = 'กำลังสร้างลิงก์...';
 
-    // 4. Cryptographic Token Generation: สร้างรหัสตั๋วเชิญที่ไม่ซ้ำกัน (Secure UUID)
+    // สร้าง Secure UUID Token สำหรับพนักงาน
     const inviteToken = crypto.randomUUID(); 
     
-    // 5. Database Interaction: บันทึกข้อมูลตั๋วเชิญลงในฐานข้อมูล Supabase
-    // (โครงสร้างข้อมูลออกแบบมาเพื่อเชื่อมโยงระบบ Admin และ POS สาขาของคุณ)
-    const { data, error } = await supabase
+    // ตรวจสอบความพร้อมของตัวแปรเชื่อมต่อ Supabase
+    if (typeof sbClient === 'undefined') {
+      throw new Error('ระบบยังไม่ได้เชื่อมต่อกับ Supabase หรือ sbClient ไม่พร้อมใช้งาน');
+    }
+
+    // 2. บันทึกข้อมูลเข้าสู่ตาราง staff_invites โดยใช้ sbClient (แก้ไขบั๊ก)
+    const { data, error } = await sbClient
       .from('staff_invites') 
       .insert([
         { 
@@ -3258,81 +3260,59 @@ async function generateInvite() {
       ])
       .select();
 
-    // หากโครงข้อมูลฝั่ง Supabase มีปัญหาหรือตรวจพบข้อผิดพลาด
     if (error) throw error;
 
-    // 6. Link Construction: สร้าง URL ปลายทางสำหรับให้พนักงานเข้ามากรอกข้อมูล Onboarding
-    // ใช้ window.location.origin เพื่อปรับเปลี่ยนตาม Environment อัตโนมัติ (Localhost / Production)
+    // 3. สร้าง URL สำหรับหน้า Onboarding ของพนักงาน
+    // ระบบจะสร้างลิงก์ตามโดเมนปัจจุบันที่คุณเปิดใช้งานอยู่โดยอัตโนมัติ
     const onboardingUrl = `${window.location.origin}/staff-register.html?token=${inviteToken}`;
     
-    // 7. Update UI Success: แสดงผลลิงก์ที่สร้างเสร็จสมบูรณ์
+    // แสดงกล่องข้อความและนำลิงก์ไปหยอดลงใน Input เพื่อให้แอดมินพร้อมคัดลอก
     linkInput.value = onboardingUrl;
-    
-    // สั่งให้พื้นที่แสดงลิงก์ค่อยๆ ปรากฏขึ้นอย่างนุ่มนวล
-    linkArea.style.opacity = '0';
     linkArea.style.display = 'block';
-    setTimeout(() => {
-      linkArea.style.transition = 'opacity 0.3s ease-in-out';
-      linkArea.style.opacity = '1';
-    }, 10);
+    
+    alert('สร้างลิงก์เชิญสำเร็จแล้ว!');
 
-    // แจ้งเตือนความสำเร็จผ่าน Toast System ของแอปพลิเคชัน
-    if (typeof showToast === 'function') {
-      showToast('สร้างลิงก์เชิญพนักงานสำเร็จแล้ว!', 'success');
-    }
-
-    // 8. Reactive UI: อัปเดตตารางรายการรอกรอกประวัติ (Pending Table) ทันทีโดยไม่ต้องรีเฟรชหน้าเว็บ
+    // โหลดตารางรอกรอกประวัติ (Pending Table) ใหม่ทันทีหลังสร้าง
     if (typeof fetchPendingInvites === 'function') {
       fetchPendingInvites();
     }
 
   } catch (error) {
-    // Error Handling: ดักจับและแสดงปัญหาทางเทคนิคอย่างละเอียดใน Console แต่กระชับที่หน้าบ้าน
     console.error('[Supabase Invite Error Detail]:', error);
-    
-    if (typeof showToast === 'function') {
-      showToast(`ไม่สามารถสร้างตั๋วเชิญได้: ${error.message || 'Network Error'}`, 'danger');
-    } else {
-      alert(`เกิดข้อผิดพลาด: ${error.message}`);
-    }
+    alert(`เกิดข้อผิดพลาด: ${error.message || 'เน็ตเวิร์กขัดข้อง'}`);
   } finally {
-    // 9. Reset UI State: คืนสภาพปุ่มกดให้กลับมาทำงานปกติไม่ว่าจะเกิด Error หรือสำเร็จก็ตาม
+    // คืนสภาพปุ่มให้แอดมินใช้งานต่อได้
     createBtn.disabled = false;
     createBtn.innerText = 'Generate Invite Link';
   }
 }
 
 /**
- * ฟังก์ชันคัดลอกลิงก์ตั๋วเชิญไปยัง Clipboard ของอุปกรณ์
- * รองรับโมเดิร์นเบราว์เซอร์ และรองรับกรณี Fallback สำหรับเบราว์เซอร์เก่า/ความปลอดภัยสูง
+ * ฟังก์ชันแชร์ลิงก์หรือคัดลอกตั๋วเชิญไปยังอุปกรณ์ปลายทาง
  */
 function shareInvite() {
-  const linkInput = document.getElementById('invite-link-url');
-
-  if (!linkInput || !linkInput.value) {
-    if (typeof showToast === 'function') {
-      showToast('ไม่พบลิงก์ที่จะคัดลอก กรุณาสร้างลิงก์ใหม่อีกครั้ง', 'warning');
-    }
+  const link = document.getElementById('invite-link-url').value;
+  
+  if (!link) {
+    alert('ไม่พบลิงก์ที่จะคัดลอก กรุณากดสร้างลิงก์เชิญใหม่อีกครั้ง');
     return;
   }
 
-  // เคลียร์และเลือกข้อความทั้งหมดในอินพุตเพื่อความชัดเจนทางสายตาของผู้ใช้
-  linkInput.select();
-  linkInput.setSelectionRange(0, 99999); // สำหรับรองรับหน้าจอมือถือ (iOS/Android)
-
-  // ตรวจสอบการใช้งาน Modern Clipboard API
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(linkInput.value)
-      .then(() => {
-        handleCopySuccess();
-      })
-      .catch(err => {
-        console.error('[Clipboard API Error] Fallback to execCommand:', err);
-        fallbackCopyMethod(linkInput);
-      });
+  // ใช้ Web Share API หากเปิดบนเบราว์เซอร์มือถือ เพื่อความสะดวกในการแชร์เข้า LINE
+  if (navigator.share) {
+    navigator.share({ 
+      title: 'Ceramic Team Onboarding', 
+      text: 'ยินดีต้อนรับสู่ทีม Ceramic! กรุณากรอกข้อมูลและตั้งรหัสผ่านผ่านลิงก์นี้ครับ', 
+      url: link 
+    }).catch((err) => {
+      // หากผู้ใช้ยกเลิกการส่ง หรือเกิดขัดข้อง ให้สลับไปเป็นคัดลอกลง Clipboard แทน
+      navigator.clipboard.writeText(link);
+      alert('คัดลอกลิงก์เรียบร้อยแล้ว!');
+    });
   } else {
-    // Fallback สำหรับกรณีที่รันบน HTTP หรือเว็บเบราว์เซอร์ที่ไม่รองรับ Clipboard API
-    fallbackCopyMethod(linkInput);
+    // ตลบหลังกรณีใช้งานบน PC หรือเบราว์เซอร์ที่ไม่รองรับ Share
+    navigator.clipboard.writeText(link);
+    alert('คัดลอกลิงก์เรียบร้อยแล้ว! สามารถส่งต่อให้พนักงานได้ทันที');
   }
 }
 
@@ -3354,7 +3334,23 @@ function fallbackCopyMethod(inputElement) {
     }
   }
 }
+function renderStaffList(staffData) {
+  const tbody = document.getElementById('staff-table-body'); // หรือไอดีของตารางที่เก็บพนักงาน
+  if (!tbody) return;
 
+  // ✨ จุดสำคัญ: ต้องล้างข้อมูลเก่าหรือรายชื่อ Mock ออกให้หมดก่อนเริ่มทำงานสเต็ปถัดไป
+  tbody.innerHTML = ''; 
+
+  if (!staffData || staffData.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="table-empty">ไม่พบข้อมูลพนักงานในระบบ</td></tr>`;
+    return;
+  }
+
+  // จากนั้นค่อยนำข้อมูลพนักงานจริงมาวนซ้ำเพื่อแสดงผล
+  staffData.forEach(staff => {
+     // ... โค้ดสร้าง tr และ td แสดงชื่อพนักงานของคุณ ...
+  });
+}
 /**
  * ฟังก์ชันเสริมสำหรับแสดงผลเมื่อทำการคัดลอกสำเร็จ
  */
