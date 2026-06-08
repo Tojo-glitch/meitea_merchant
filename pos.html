@@ -1271,16 +1271,16 @@ if (!window.API.getBranches) window.API.getBranches = async function() {
 
 /* staffLogin — queries Supabase staff table, verifies pin_hash */
 /* staffLogin — queries Supabase staff table, verifies pos_pin_hash */
-if (!window.API.staffLogin) window.API.staffLogin = async function(username, pin) {
+window.API.staffLogin = async function(username, pin) {
   // --- Supabase path ---
   if (SB.url && STORE.authMode !== 'mock') {
     try {
       const pinHash = await sha256(pin);
       const rows = await SB.query('staff', {
-        // แก้ชื่อคอลัมน์จาก pin_hash เป็น pos_pin_hash ให้ตรงกับ Database
         select: 'id,name,username,role,branch_id,pos_pin_hash,is_active', 
-        eq:     { username: username.trim().toLowerCase() },
+        eq:     { username: username.trim() }, // ค้นหาตามที่พิมพ์มาเป๊ะๆ
       });
+      
       if (!rows.length) return { success:false, message:'ไม่พบชื่อผู้ใช้ในระบบ (Username not found)' };
       
       const staff = rows[0];
@@ -1304,13 +1304,12 @@ if (!window.API.staffLogin) window.API.staffLogin = async function(username, pin
 };
 
 /* verifyManagerPin — filter by role in query */
-if (!window.API.verifyManagerPin) window.API.verifyManagerPin = async function(pin) {
+window.API.verifyManagerPin = async function(pin) {
   if (SB.url && STORE.authMode !== 'mock') {
     try {
       const pinHash = await sha256(pin);
       const rows = await SB.query('staff', {
         select: 'id,name,role,is_active',
-        // แก้ชื่อคอลัมน์เป็น pos_pin_hash
         eq:     { pos_pin_hash: pinHash, is_active: true }, 
       });
       const mgr = rows.find(s => s.role === 'MANAGER' || s.role === 'ADMIN');
@@ -1429,7 +1428,7 @@ let _pollInterval = STORE.pollSec;
 async function doLogin() {
   const branchId   = ge('branchSelect').value;
   const branchText = ge('branchSelect').options[ge('branchSelect').selectedIndex]?.text || branchId;
-  const user = ge('staffUser').value.trim().toLowerCase();
+  const user = ge('staffUser').value.trim();
   const pin  = ge('pinInp').value.trim();
   const err  = ge('loginError');
   const btn  = ge('loginBtn');
