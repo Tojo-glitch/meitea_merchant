@@ -655,6 +655,61 @@ async register({ phone, email, name, hashedPassword }) {
       }
     },
 
+    // 5. ฟังก์ชันอัปโหลดเอกสาร (บัตร ปชช, สมุดบัญชี, ลายเซ็น) ไปที่ Supabase Storage
+    async uploadHrDoc(file, filename) {
+      try {
+        // ใช้ fetch ตรงๆ เพื่อส่งไฟล์แบบ Binary
+        const res = await fetch(`${SUPABASE_URL}/storage/v1/object/hr_docs/${filename}`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${getToken()}`,
+            'Content-Type': file.type || 'application/octet-stream'
+          },
+          body: file
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        
+        // คืนค่า URL ที่สามารถเข้าถึงได้แบบ Public
+        return `${SUPABASE_URL}/storage/v1/object/public/hr_docs/${filename}`;
+      } catch (e) {
+        throw new Error('อัปโหลดไฟล์ล้มเหลว: ' + e.message);
+      }
+    },
+
+    // 6. ฟังก์ชันบันทึกข้อมูล Onboarding ทั้งหมดทับ Dummy Staff
+    async completeOnboarding(id, payload) {
+      try {
+        // เข้ารหัส PIN และ Password ก่อนลง Database เพื่อความปลอดภัย
+        const pinHash = await sha256(payload.pin + 'CTB_SALT_2025');
+        const passHash = await sha256(payload.password + 'CTB_SALT_2025');
+
+        // จัดเตรียมข้อมูลให้ตรงกับ Column ในตาราง staff
+        const updateData = {
+          name: payload.fullName,
+          nickname: payload.nickname,
+          username: payload.username,
+          pos_pin_hash: pinHash,
+          password_hash: passHash,
+          phone: payload.phone,
+          id_card: payload.idNum,
+          emergency_contact: payload.emergency,
+          bank_name: payload.bankName,
+          bank_account: payload.bankAcc,
+          id_card_url: payload.idCardUrl,
+          bank_book_url: payload.bankBookUrl,
+          signature_url: payload.signatureUrl,
+          is_active: true // เปลี่ยนสถานะเป็นเปิดใช้งาน
+        };
+
+        await sb.update('staff', updateData, { id: id });
+        return success();
+      } catch (e) {
+        return fail(e.message);
+      }
+    },
+
     async staffLogin(username, pin) {
       try {
         const hash = await sha256(
