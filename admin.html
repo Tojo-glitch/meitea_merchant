@@ -3202,84 +3202,169 @@ function openInviteModal() {
 }
 
 // 2. กดสร้างลิงก์ (จองที่ไว้ใน Database)
+/**
+ * ฟังก์ชันสร้างตั๋วเชิญพนักงานใหม่ (Staff Invitation) และบันทึกลง Supabase
+ * รองรับการกำหนดสาขา (Branch) และสิทธิ์การใช้งาน (Role)
+ */
 async function generateInvite() {
-  const role = document.getElementById('is-role').value;
-  const branchId = document.getElementById('is-branch').value;
-  
-  if(!branchId) { 
-    alert('กรุณาเลือกสาขาครับ'); return; 
+  // 1. ดึง Element จาก DOM เพื่อเตรียมใช้งาน
+  const branchSelect = document.getElementById('is-branch');
+  const roleSelect = document.getElementById('is-role');
+  const createBtn = document.getElementById('btn-create-invite');
+  const linkArea = document.getElementById('invite-link-area');
+  const linkInput = document.getElementById('invite-link-url');
+
+  // ตรวจสอบความพร้อมของ DOM Elements เพื่อป้องกัน Uncaught TypeError
+  if (!branchSelect || !roleSelect || !createBtn || !linkArea || !linkInput) {
+    console.error('[Invite Error] Required DOM elements are missing.');
+    return;
   }
 
-  const btn = document.getElementById('btn-create-invite');
-  btn.textContent = 'Generating...'; 
-  btn.disabled = true;
+  const branchId = branchSelect.value ? branchSelect.value.trim() : '';
+  const role = roleSelect.value ? roleSelect.value.trim() : 'STAFF';
 
-  // 💡 ทริค: เราส่งข้อมูล Dummy (ชั่วคราว) ไปจองที่ไว้ก่อน เพราะ Database บังคับห้ามว่าง
-  // เดี๋ยวพนักงานกรอก Onboarding เสร็จ ข้อมูลจริงจะไปทับข้อมูล Dummy พวกนี้เองครับ
-  const tempId = Math.random().toString(36).substr(2, 8);
-  const dummyData = {
-    name: 'Pending Staff',
-    email: `pending_${tempId}@ceramic.co`,
-    username: `user_${tempId}`,
-    role: role,
-    branch_id: branchId
-  };
-
-  API.inviteStaff(dummyData).then(res => {
-    if(res.success) {
-      // สร้างลิงก์ที่มี ID อ้างอิง
-      const link = `${window.location.origin}/onboarding.html?id=${res.staff.id}&branch=${branchId}`;
-      document.getElementById('invite-link-url').value = link;
-      document.getElementById('invite-link-area').style.display = 'block';
-      btn.style.display = 'none';
-      toast('สร้างลิงก์เชิญสำเร็จ!', 'success');
+  // 2. Validation: ตรวจสอบข้อมูลก่อนส่งขึนเซิร์ฟเวอร์
+  if (!branchId) {
+    if (typeof showToast === 'function') {
+      showToast('กรุณาเลือกสาขาก่อนสร้างลิงก์เชิญ', 'warning');
     } else {
-      alert('Error: ' + (res.message || ''));
-      btn.textContent = 'Generate Invite Link'; 
-      btn.disabled = false;
+      alert('กรุณาเลือกสาขาก่อนสร้างลิงก์เชิญ');
     }
-  }).catch(err => {
-    alert('Connection error: ' + err.message);
-    btn.textContent = 'Generate Invite Link'; 
-    btn.disabled = false;
-  });
+    branchSelect.focus();
+    return;
+  }
+
+  try {
+    // 3. UI Loading State: เปิดสถานะกำลังโหลด ป้องกันการส่งคำขอซ้ำ (Idempotency)
+    createBtn.disabled = true;
+    const originalBtnText = createBtn.innerText;
+    createBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>กำลังสร้างลิงก์...';
+
+    // 4. Cryptographic Token Generation: สร้างรหัสตั๋วเชิญที่ไม่ซ้ำกัน (Secure UUID)
+    const inviteToken = crypto.randomUUID(); 
+    
+    // 5. Database Interaction: บันทึกข้อมูลตั๋วเชิญลงในฐานข้อมูล Supabase
+    // (โครงสร้างข้อมูลออกแบบมาเพื่อเชื่อมโยงระบบ Admin และ POS สาขาของคุณ)
+    const { data, error } = await supabase
+      .from('staff_invites') 
+      .insert([
+        { 
+          token: inviteToken, 
+          branch_id: branchId, 
+          role: role, 
+          status: 'PENDING',
+          created_at: new Date().toISOString()
+        }
+      ])
+      .select();
+
+    // หากโครงข้อมูลฝั่ง Supabase มีปัญหาหรือตรวจพบข้อผิดพลาด
+    if (error) throw error;
+
+    // 6. Link Construction: สร้าง URL ปลายทางสำหรับให้พนักงานเข้ามากรอกข้อมูล Onboarding
+    // ใช้ window.location.origin เพื่อปรับเปลี่ยนตาม Environment อัตโนมัติ (Localhost / Production)
+    const onboardingUrl = `${window.location.origin}/staff-register.html?token=${inviteToken}`;
+    
+    // 7. Update UI Success: แสดงผลลิงก์ที่สร้างเสร็จสมบูรณ์
+    linkInput.value = onboardingUrl;
+    
+    // สั่งให้พื้นที่แสดงลิงก์ค่อยๆ ปรากฏขึ้นอย่างนุ่มนวล
+    linkArea.style.opacity = '0';
+    linkArea.style.display = 'block';
+    setTimeout(() => {
+      linkArea.style.transition = 'opacity 0.3s ease-in-out';
+      linkArea.style.opacity = '1';
+    }, 10);
+
+    // แจ้งเตือนความสำเร็จผ่าน Toast System ของแอปพลิเคชัน
+    if (typeof showToast === 'function') {
+      showToast('สร้างลิงก์เชิญพนักงานสำเร็จแล้ว!', 'success');
+    }
+
+    // 8. Reactive UI: อัปเดตตารางรายการรอกรอกประวัติ (Pending Table) ทันทีโดยไม่ต้องรีเฟรชหน้าเว็บ
+    if (typeof fetchPendingInvites === 'function') {
+      fetchPendingInvites();
+    }
+
+  } catch (error) {
+    // Error Handling: ดักจับและแสดงปัญหาทางเทคนิคอย่างละเอียดใน Console แต่กระชับที่หน้าบ้าน
+    console.error('[Supabase Invite Error Detail]:', error);
+    
+    if (typeof showToast === 'function') {
+      showToast(`ไม่สามารถสร้างตั๋วเชิญได้: ${error.message || 'Network Error'}`, 'danger');
+    } else {
+      alert(`เกิดข้อผิดพลาด: ${error.message}`);
+    }
+  } finally {
+    // 9. Reset UI State: คืนสภาพปุ่มกดให้กลับมาทำงานปกติไม่ว่าจะเกิด Error หรือสำเร็จก็ตาม
+    createBtn.disabled = false;
+    createBtn.innerText = 'Generate Invite Link';
+  }
 }
 
-// 3. ฟังก์ชันแชร์ลิงก์
+/**
+ * ฟังก์ชันคัดลอกลิงก์ตั๋วเชิญไปยัง Clipboard ของอุปกรณ์
+ * รองรับโมเดิร์นเบราว์เซอร์ และรองรับกรณี Fallback สำหรับเบราว์เซอร์เก่า/ความปลอดภัยสูง
+ */
 function shareInvite() {
-  const link = document.getElementById('invite-link-url').value;
-  if (navigator.share) {
-    navigator.share({ 
-      title: 'Ceramic Team Onboarding', 
-      text: 'ยินดีต้อนรับสู่ทีม Ceramic! กรุณากรอกข้อมูลและยืนยันตัวตนผ่านลิงก์นี้ครับ', 
-      url: link 
-    }).catch(() => {
-      navigator.clipboard.writeText(link);
-      alert('คัดลอกลิงก์แล้ว!');
-    });
+  const linkInput = document.getElementById('invite-link-url');
+
+  if (!linkInput || !linkInput.value) {
+    if (typeof showToast === 'function') {
+      showToast('ไม่พบลิงก์ที่จะคัดลอก กรุณาสร้างลิงก์ใหม่อีกครั้ง', 'warning');
+    }
+    return;
+  }
+
+  // เคลียร์และเลือกข้อความทั้งหมดในอินพุตเพื่อความชัดเจนทางสายตาของผู้ใช้
+  linkInput.select();
+  linkInput.setSelectionRange(0, 99999); // สำหรับรองรับหน้าจอมือถือ (iOS/Android)
+
+  // ตรวจสอบการใช้งาน Modern Clipboard API
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(linkInput.value)
+      .then(() => {
+        handleCopySuccess();
+      })
+      .catch(err => {
+        console.error('[Clipboard API Error] Fallback to execCommand:', err);
+        fallbackCopyMethod(linkInput);
+      });
   } else {
-    navigator.clipboard.writeText(link);
+    // Fallback สำหรับกรณีที่รันบน HTTP หรือเว็บเบราว์เซอร์ที่ไม่รองรับ Clipboard API
+    fallbackCopyMethod(linkInput);
+  }
+}
+
+/**
+ * ฟังก์ชันเสริมสำหรับคัดลอกลิงก์แบบเก่า (Fallback Method)
+ */
+function fallbackCopyMethod(inputElement) {
+  try {
+    const successful = document.execCommand('copy');
+    if (successful) {
+      handleCopySuccess();
+    } else {
+      throw new Error('execCommand copy was unsuccessful');
+    }
+  } catch (err) {
+    console.error('[Fallback Copy Error]:', err);
+    if (typeof showToast === 'function') {
+      showToast('ไม่สามารถคัดลอกอัตโนมัติได้ กรุณากดคัดลอกด้วยตนเอง', 'danger');
+    }
+  }
+}
+
+/**
+ * ฟังก์ชันเสริมสำหรับแสดงผลเมื่อทำการคัดลอกสำเร็จ
+ */
+function handleCopySuccess() {
+  if (typeof showToast === 'function') {
+    showToast('คัดลอกลิงก์ไปยังคลิปบอร์ดแล้ว! ส่งให้พนักงานได้ทันที', 'success');
+  } else {
     alert('คัดลอกลิงก์เรียบร้อยแล้ว!');
   }
 }
-/* ── BOOT ───────────────────────────────────────────── */
-// window.onload is handled by adminLogin block above (Supabase auto-session check)
-// This is the fallback for dev mode without Supabase
-if(typeof sbClient === 'undefined' || !window.ENV?.URL) {
-  window.addEventListener('load', () => {
-    const saved=localStorage.getItem('ctb_admin');
-    if(saved){
-      try{
-        A.admin=JSON.parse(saved);
-        ge('login-overlay').style.display='none';
-        ge('admin-name-chip').textContent=A.admin.name||'Admin';
-        ge('admin-av').textContent=(A.admin.name||'A')[0].toUpperCase();
-        initDashboard();
-      }catch(e){}
-    }
-  });
-}
-
 </script>
 </body>
 </html>
