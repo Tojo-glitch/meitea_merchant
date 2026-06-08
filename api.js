@@ -562,6 +562,99 @@ async register({ phone, email, name, hashedPassword }) {
 
     /* ================= STAFF ================= */
 
+      async getStaff() {
+      try {
+        // ดึงข้อมูลพนักงาน
+        const staffData = await sb.query('staff', { 
+          select: '*', 
+          order: 'created_at.desc' 
+        });
+        
+        // ดึงข้อมูลสาขามาเพื่อจับคู่ชื่อสาขา
+        const branchData = await sb.query('branches', { 
+          select: 'id,name' 
+        });
+
+        // แมปชื่อสาขาเข้าไปในข้อมูล Staff
+        const data = staffData.map(s => {
+          const b = branchData.find(br => br.id === s.branch_id);
+          return { 
+            ...s, 
+            branch_name: b ? b.name : 'Unknown Branch' 
+          };
+        });
+
+        return success({ data });
+      } catch (e) {
+        return fail(e.message);
+      }
+    },
+
+    // 2. สร้างลิงก์เชิญ (เพิ่ม Dummy Staff ลง Database)
+    async inviteStaff(data) {
+      try {
+        // ใช้ Request ตรงๆ แทน sb.insert เพราะเราต้องการ id ที่ถูกสร้างกลับมาด้วย (Prefer: return=representation)
+        const res = await request(`${SUPABASE_URL}/rest/v1/staff`, {
+          method: 'POST',
+          headers: headers({ 'Prefer': 'return=representation' }),
+          body: JSON.stringify(data)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        
+        const rows = await res.json();
+        // ส่งคืน staff ที่ถูกสร้างกลับไป เพื่อเอา id ไปทำ Onboarding Link
+        return success({ staff: rows[0] });
+      } catch (e) {
+        return fail(e.message);
+      }
+    },
+
+    // 3. อัปเดตข้อมูล/ระงับบัญชีพนักงาน
+    async updateStaff(id, data) {
+      try {
+        // ถ้ามีการแก้รหัส PIN ผ่าน Admin ให้เข้ารหัสก่อนเซฟ
+        if (data.pos_pin) {
+          data.pos_pin_hash = await sha256(data.pos_pin + 'CTB_SALT_2025');
+          delete data.pos_pin; // ลบ pin แบบ text ทิ้งก่อนลง DB
+        }
+
+        await sb.update('staff', data, { id: id });
+        return success();
+      } catch (e) {
+        return fail(e.message);
+      }
+    },
+
+    // 4. (แถม) สำหรับดึง Activity Log ของพนักงาน
+    async getActivityLog() {
+      try {
+        const data = await sb.query('analytics_events', { 
+          select: '*', 
+          order: 'created_at.desc', 
+          limit: 100 
+        });
+        
+        // แปลงข้อมูลให้ตรงกับ format ที่ UI ต้องการ
+        const formatted = data.map(d => {
+          const props = JSON.parse(d.properties || '{}');
+          return {
+            id: d.id,
+            type: props.type || 'system',
+            staff: props.staff_name || 'Unknown',
+            branch: props.branch_name || '-',
+            action: d.event_name,
+            amount: props.amount || null,
+            time: d.created_at
+          };
+        });
+
+        return success({ data: formatted });
+      } catch (e) {
+        return fail(e.message);
+      }
+    },
+
     async staffLogin(username, pin) {
       try {
         const hash = await sha256(
