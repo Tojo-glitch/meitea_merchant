@@ -678,14 +678,14 @@ async register({ phone, email, name, hashedPassword }) {
       }
     },
 
-    // 6. ฟังก์ชันบันทึกข้อมูล Onboarding ทั้งหมดทับ Dummy Staff
+// 6. ฟังก์ชันบันทึกข้อมูล Onboarding ทั้งหมดทับ Dummy Staff
     async completeOnboarding(id, payload) {
       try {
-        // เข้ารหัส PIN และ Password ก่อนลง Database เพื่อความปลอดภัย
+        // เข้ารหัส PIN และ Password ก่อนลง Database
         const pinHash = await sha256(payload.pin + 'CTB_SALT_2025');
         const passHash = await sha256(payload.password + 'CTB_SALT_2025');
 
-        // จัดเตรียมข้อมูลให้ตรงกับ Column ในตาราง staff
+        // จัดเตรียมข้อมูล (แก้ชื่อคอลัมน์ให้ตรงกับ Database ของคุณ)
         const updateData = {
           name: payload.fullName,
           nickname: payload.nickname,
@@ -693,19 +693,22 @@ async register({ phone, email, name, hashedPassword }) {
           pos_pin_hash: pinHash,
           password_hash: passHash,
           phone: payload.phone,
-          id_card: payload.idNum,
+          id_number: payload.idNum,             // <--- แก้ให้ตรงกับรูปของคุณ
           emergency_contact: payload.emergency,
           bank_name: payload.bankName,
           bank_account: payload.bankAcc,
           id_card_url: payload.idCardUrl,
           bank_book_url: payload.bankBookUrl,
           signature_url: payload.signatureUrl,
-          is_active: true // เปลี่ยนสถานะเป็นเปิดใช้งาน
+          onboarding_status: 'COMPLETED',       // <--- เปลี่ยนสถานะจาก PENDING เป็น COMPLETED
+          is_active: true
         };
 
+        // สั่งอัปเดตไปที่ Supabase
         await sb.update('staff', updateData, { id: id });
         return success();
       } catch (e) {
+        console.error("Supabase Update Error:", e);
         return fail(e.message);
       }
     },
