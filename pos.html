@@ -1381,6 +1381,7 @@ if (!window.API.validatePromoCode) window.API.validatePromoCode = async function
 
 /* ── UTILITIES ──────────────────────────────────── */
 const ge = id => document.getElementById(id);
+const safeSet = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 const fmt = n => '฿' + (Number(n) || 0).toLocaleString();
 let _toastT;
 function toast(msg, type='info', dur=2800) {
