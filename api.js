@@ -287,7 +287,7 @@ async signUp(params) {
           return fail('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
         }
 
-        const rows = await sb.query('members', {
+        const rows = await sb.query('bers', {
           eq: { auth_id: data.user.id },
           select: '*'
         });
@@ -348,8 +348,8 @@ async register({ phone, email, name, hashedPassword }) {
           return fail('Registration failed – unable to retrieve user ID.');
         }
 
-        // 3. บันทึกข้อมูลลงตาราง members ของเรา
-        await sb.insert('members', {
+        // 3. บันทึกข้อมูลลงตาราง bers ของเรา
+        await sb.insert('bers', {
           auth_id: authId,
           phone: String(phone),
           email: realEmail,
@@ -543,22 +543,43 @@ async register({ phone, email, name, hashedPassword }) {
       }
     },
 
-    /* ================= MEMBERS ================= */
+   /* ================= MEMBERS ================= */
 
-    async updatePoints({ userId, points }) {
+    // 1. ฟังก์ชันดึงข้อมูลลูกค้าทั้งหมด (สำหรับหน้า Admin)
+    async getAdminMembers() {
       try {
-        await sb.update(
-          'members',
-          { points },
-          { auth_id: userId }
-        );
+        const data = await sb.query('members', {
+          select: '*',
+          order: 'created_at.desc' // เรียงจากสมัครล่าสุด
+        });
 
+        return success({ data });
+      } catch (e) {
+        return fail(e.message);
+      }
+    },
+
+    // 2. ฟังก์ชันแก้ไขประวัติ และ ระงับการใช้งานลูกค้า (สำหรับหน้า Admin)
+    async updateMemberFull(id, data) {
+      try {
+        await sb.update('members', data, { id: id });
         return success();
       } catch (e) {
         return fail(e.message);
       }
     },
 
+    // 3. ฟังก์ชันอัปเดตแค่คะแนน
+    async updatePoints({ userId, points }) {
+      try {
+        await sb.update('members', { points }, { auth_id: userId });
+        return success();
+      } catch (e) {
+        return fail(e.message);
+      }
+    },
+
+    // 4. ฟังก์ชันค้นหาลูกค้าด้วยเบอร์โทร (สำหรับหน้า POS)
     async getMemberByPhone(phone) {
       try {
         const rows = await sb.query('members', {
