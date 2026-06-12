@@ -320,6 +320,18 @@ input::placeholder{color:var(--tan3)}
 .sb-row:last-child{border-bottom:none}
 .sb-row .v{color:var(--gl);font-weight:600}
 
+/* ═══ MEMBER HISTORY MODAL ══════════════════════════════ */
+.mh-card { background: var(--c2); border: 1px solid var(--ln2); border-radius: 12px; padding: 14px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 12px; }
+.mh-ico { width: 40px; height: 40px; background: var(--c3); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--tan2); }
+.mh-info { flex: 1; }
+.mh-id { font-size: 13px; font-weight: 700; color: var(--tan); margin-bottom: 2px; }
+.mh-date { font-size: 10px; color: var(--tan3); margin-left: 6px; font-weight: 400; }
+.mh-items { font-size: 11px; color: var(--tan3); line-height: 1.5; margin-bottom: 6px; }
+.mh-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+.mh-total { font-family: var(--serif); font-size: 16px; color: var(--gl); }
+.mh-reorder { height: 32px; background: rgba(212,170,106,.15); border: 1px solid rgba(212,170,106,.3); border-radius: 8px; padding: 0 12px; font-size: 11px; font-weight: 700; color: var(--gl); cursor: pointer; transition: all 0.15s; }
+.mh-reorder:active { background: var(--gl); color: var(--c0); }
+
 /* ═══ ETA IN SLIP MODAL ═════════════════════════════════ */
 .eta-row{display:flex;align-items:center;gap:8px;margin:12px 0 4px;background:var(--c2);border:1px solid var(--ln2);border-radius:8px;padding:8px 12px}
 .eta-lbl{font-size:12px;color:var(--tan3);flex:1}
@@ -883,7 +895,7 @@ input::placeholder{color:var(--tan3)}
         <input type="tel" id="memPhone" placeholder="Customer phone (optional)" onkeydown="if(event.key==='Enter')findMember()" style="height:38px">
         <button class="btn btn-ghost btn-sm" onclick="findMember()">Find</button>
       </div>
-      <div class="mem-info" id="memInfoRow">
+    <div class="mem-info" id="memInfoRow">
         <div style="flex:1">
           <div class="mem-name" id="memName">Member</div>
           <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
@@ -891,9 +903,11 @@ input::placeholder{color:var(--tan3)}
             <span class="mem-pts" id="memPts">0 pts</span>
           </div>
         </div>
+        <!-- เพิ่มปุ่มดูประวัติ -->
+        <button class="btn btn-ghost btn-sm" onclick="openMemberHistory()" style="height:30px; padding:0 10px; font-size:11px;">🕒 ประวัติ</button>
+        <!-- ปุ่มกากบาทลบลูกค้า -->
         <button class="btn-icon btn-sm" style="width:30px;height:30px" onclick="removeMember()">✕</button>
       </div>
-    </div>
 
     <!-- Summary -->
     <div class="t-summary">
@@ -1079,6 +1093,25 @@ input::placeholder{color:var(--tan3)}
     <div class="modal-foot" style="flex-shrink:0;margin-top:0;padding-top:16px;border-top:1px solid var(--line)">
       <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeOverlay('settingsOv')">Cancel</button>
       <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     MEMBER HISTORY MODAL
+═══════════════════════════════════════════════════ -->
+<div class="overlay" id="memberHistoryOv">
+  <div class="modal" style="max-width:500px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div>
+        <div class="modal-title" style="margin-bottom:2px;" id="mhName">Customer History</div>
+        <div style="font-size:11px; color:var(--tan3);">ประวัติการสั่งซื้อทั้งหมดของลูกค้าท่านนี้</div>
+      </div>
+      <div class="modal-close" style="position:static" onclick="closeOverlay('memberHistoryOv')">✕</div>
+    </div>
+    
+    <div id="mhList" style="max-height:60vh; overflow-y:auto; padding-right:4px;">
+      <!-- ประวัติจะถูกใส่ตรงนี้ผ่าน JS -->
     </div>
   </div>
 </div>
@@ -2249,6 +2282,102 @@ function removeMember() {
   ge('memInfoRow').style.display  = 'none';
 }
 
+/* ── MEMBER HISTORY & REORDER ───────────────────── */
+let CUR_MEMBER_ORDERS = [];
+
+async function openMemberHistory() {
+  if (!CUR_MEMBER) return;
+  
+  ge('mhName').textContent = `ประวัติของ ${CUR_MEMBER.name}`;
+  ge('mhList').innerHTML = '<div style="padding:40px;text-align:center;color:var(--tan3)">กำลังดึงข้อมูล...</div>';
+  ge('memberHistoryOv').classList.add('on');
+
+  try {
+    // ดึงประวัติจาก Supabase
+    const res = await API.getOrderHistory(CUR_MEMBER.id);
+    
+    if (res.success) {
+      CUR_MEMBER_ORDERS = res.data;
+      renderMemberHistory();
+    } else {
+      ge('mhList').innerHTML = '<div style="padding:40px;text-align:center;color:var(--red)">ไม่สามารถดึงข้อมูลได้</div>';
+    }
+  } catch(e) {
+    ge('mhList').innerHTML = '<div style="padding:40px;text-align:center;color:var(--red)">เกิดข้อผิดพลาดในการเชื่อมต่อ</div>';
+  }
+}
+
+function renderMemberHistory() {
+  const el = ge('mhList');
+  if (!CUR_MEMBER_ORDERS.length) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--tan3)">ลูกค้ารายนี้ยังไม่เคยมีประวัติการสั่งซื้อ</div>';
+    return;
+  }
+
+  el.innerHTML = CUR_MEMBER_ORDERS.map((o, index) => {
+    // แปลงข้อมูล Items จากข้อความกลับมาเป็น Array
+    let items = [];
+    try { items = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []); } catch(e) {}
+    
+    const dateObj = new Date(o.created_at);
+    const dateStr = dateObj.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) + ' ' + dateObj.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    
+    // สร้างสรุปรายการอาหาร
+    const summary = items.map(i => `${i.qty}x ${i.name} ${i.opts ? `<br><span style="color:var(--tan4);font-size:10px;">(${i.opts})</span>` : ''}`).join('<div style="height:4px"></div>');
+
+    return `<div class="mh-card">
+      <div class="mh-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>
+      <div class="mh-info">
+        <div class="mh-id">${o.id} <span class="mh-date">${dateStr}</span></div>
+        <div style="font-size:10px; color:var(--tan3); margin-bottom:6px;">สาขา: ${o.branch_name || 'ไม่ระบุ'} · ชำระด้วย: ${o.payment_method || '-'}</div>
+        <div class="mh-items">${summary}</div>
+      </div>
+      <div class="mh-right">
+        <div class="mh-total">฿${o.total_amount}</div>
+        <button class="mh-reorder" onclick="reorderFromHistory(${index})">เอาเหมือนเดิม</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function reorderFromHistory(index) {
+  const order = CUR_MEMBER_ORDERS[index];
+  if (!order) return;
+
+  let items = [];
+  try { items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []); } catch(e) {}
+  
+  let addedCount = 0;
+
+  items.forEach(it => {
+    // เช็คว่าเมนูนี้ยังมีขายอยู่ไหมในระบบปัจจุบัน
+    const currentMenu = MENUS.find(m => m.id === it.id || m.name === it.name);
+    
+    if (currentMenu && currentMenu.is_available !== false) {
+      TICKET.push({
+        uid: Date.now() + Math.random(),
+        id: currentMenu.id,
+        name: currentMenu.name,
+        price: it.price, // ดึงราคาเดิมที่ลูกค้าเคยซื้อ (หรือจะแก้เป็น currentMenu.price ก็ได้ครับ)
+        qty: it.qty,
+        opts: it.opts || '',
+        options: it.options || {},
+        addons: it.addons || [],
+        note: it.note || ''
+      });
+      addedCount++;
+    }
+  });
+
+  if (addedCount > 0) {
+    closeOverlay('memberHistoryOv');
+    updateTicket();
+    toast(`เพิ่ม ${addedCount} รายการลงบิลปัจจุบันแล้ว`, 'success');
+  } else {
+    toast('ไม่สามารถเพิ่มได้ (เมนูอาจถูกยกเลิกการขายไปแล้ว)', 'warn');
+  }
+}
+  
 /* ── ORDER TYPE ─────────────────────────────────── */
 function setOrderType(type, btn) {
   ORDER_TYPE = type;
