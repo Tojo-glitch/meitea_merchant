@@ -1434,6 +1434,101 @@ window.onload = async () => {
   // 5. Apply settings (QR, Points visibility etc)
   applyInitialSettings();
 };
+/* ── PLACE ORDER (Validation + Force Login + Slip Upload) ── */
+async function placeOrder() {
+  // 1. ตรวจสอบตะกร้า
+  if (!S.cart.length) { toast('Your cart is empty', 'warn'); return; }
+
+  // 2. บังคับ Login ก่อนจ่ายเงิน
+  if (!S.user) {
+    toast('กรุณาเข้าสู่ระบบก่อนชำระเงิน','warn');
+    S._pendingCheckout = true;
+    closeCart();
+    openAuth('login');
+    return;
+  }
+
+  // 3. ตรวจสอบข้อมูลที่อยู่ / เวลา
+  var addr = '', phone = '', time = '';
+  if(S.orderType === 'delivery') {
+      addr = ge('cartDelAddr') ? ge('cartDelAddr').value.trim() : '';
+      phone = ge('cartDelPhone') ? ge('cartDelPhone').value.trim() : '';
+      if(!addr || !phone) { toast('กรุณาระบุที่อยู่และเบอร์โทรให้ครบถ้วน', 'warn'); return; }
+  } else if (S.orderType === 'preorder') {
+      time = ge('cartPreTime') ? ge('cartPreTime').value : '';
+      if(!time) { toast('กรุณาระบุเวลารับของ', 'warn'); return; }
+      if(new Date(time) < new Date()) { toast('ไม่สามารถเลือกเวลาในอดีตได้', 'warn'); return; }
+  }
+
+  // 4. ตรวจสอบสลิป (บังคับต้องมี)
+  if (!S.slipFile) { toast('กรุณาแนบสลิปโอนเงิน','warn'); return; }
+  
+  var btn = ge('placeBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading Slip...'; }
+  
+  var total = calcTotal();
+
+  try {
+    // 5. อัปโหลดสลิปเข้า Storage ถัง receipt_slips (หรือชื่อที่คุณตั้งไว้)
+    let slipUrl = null;
+    if (window.API && API.uploadSlip) {
+       // **จุดแก้: รอให้อัปโหลดเสร็จและได้ URL คืนมาก่อน**
+       slipUrl = await API.uploadSlip(S.slipFile);
+    } else {
+       throw new Error('Upload function not found in API');
+    }
+
+    if (!slipUrl) throw new Error('Slip upload failed');
+
+    if (btn) btn.textContent = 'Processing Order...';
+
+    // 6. เตรียมข้อมูลส่งเข้า API
+    const payload = {
+      items: S.cart,
+      total: total,
+      branch: S.branch,
+      type: S.orderType,
+      userId: S.user.id,
+      promoCode: S.disc > 0 ? (ge('promoInp')?.value || null) : null,
+      disc: S.disc,
+      slipUrl: slipUrl,  // **จุดแก้: แนบ URL ของสลิปที่ได้มาใส่ใน payload**
+      status: 'PENDING',
+      delivery_address: addr,
+      delivery_phone: phone,
+      pickup_time: time
+    };
+
+    const res = await API.createOrder(payload);
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm & Pay'; }
+    closeCart();
+    
+    var orderId = res.id || 'CTB-' + Date.now().toString(36).toUpperCase();
+    S.order = { id: orderId, status: 'pending', items: S.cart.slice(), total: total, branch: S.branch.name, queueNum: res.queue_number||null };
+    try{localStorage.setItem('ctb_order',JSON.stringify(S.order))}catch(e){}
+    
+    // 7. เคลียร์ตะกร้าและลบออกจาก LocalStorage (ถ้า API สำเร็จมันจะทำงานตรงนี้)
+    S.cart = []; S.disc = 0; S.slipFile = null; saveCart();
+    
+    ge('slipPrev').classList.remove('on');
+    ge('slipChg').classList.remove('on');
+    ge('slipLbl').textContent = 'Upload payment slip';
+    if(ge('cartDelAddr')) ge('cartDelAddr').value = '';
+    if(ge('cartDelPhone')) ge('cartDelPhone').value = '';
+    if(ge('cartPreTime')) ge('cartPreTime').value = '';
+    
+    updCartBar();
+    startPoll();
+    
+    toast('Order Placed Successfully!', 'success');
+    nav('pg-track', 'nt-track');
+
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm & Pay'; }
+    toast('Order failed: ' + err.message, 'error');
+    console.error(err);
+  }
+}
 
 /* ── BRANCH DROPDOWN ─────────────────────────────── */
 async function loadBranchDropdown() {
