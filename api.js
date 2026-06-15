@@ -407,7 +407,8 @@ async createOrder(payload) {
           status: payload.status || 'PENDING',
           source: payload.source || 'POS',
           staff_name: payload.staff_name || null,
-          queue_number: payload.queue_number || null
+          queue_number: payload.queue_number || null,
+          slip_url: payload.slipUrl || null
         };
 
         // ยิงคำสั่งไปที่ Supabase โดยตรง เพื่อขอข้อมูล (id และ created_at) กลับมาทันที
