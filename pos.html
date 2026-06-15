@@ -2803,13 +2803,32 @@ function processPayment() {
     return;
   }
 
-  API.createOrder(payload).then(res => {
+ API.createOrder(payload).then(res => {
+    // ดัก Error ถ้า API พัง จะได้ไม่ไปต่อจนใบเสร็จค้าง
+    if (!res.success) {
+      toast('Checkout failed: ' + res.message, 'error');
+      btn.textContent = 'Confirm Payment'; btn.disabled = false;
+      return;
+    }
 
     closeOverlay('checkoutOv');
     ge('queueBadge').textContent = '#' + queueNum;
     ge('queueBadge').style.display = 'inline-flex';
 
-    // Auto-print or ask
+    // สร้างข้อมูล LAST_ORDER เพื่อส่งให้เครื่องปริ้นท์
+    LAST_ORDER = {
+      id: res.id || 'CTB-' + Date.now().toString(36).toUpperCase(),
+      created_at: res.created_at || new Date().toISOString(),
+      items: TICKET,
+      total: CO_TOTAL,
+      discount: CO_DISCOUNT,
+      payment_method: payLabel,
+      type: ORDER_TYPE,
+      staff_name: CURRENT_STAFF?.name,
+      queueNum: queueNum
+    };
+
+    // สั่งปริ้นท์ใบเสร็จ
     if (STORE.autoprint) {
       printReceipt(LAST_ORDER, Number(PRINTER.copies));
     } else {
