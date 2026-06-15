@@ -392,31 +392,44 @@ async register({ phone, email, name, hashedPassword }) {
 
     /* ================= ORDERS ================= */
 
-    async createOrder(payload) {
+async createOrder(payload) {
       try {
-        const rows = await sb.insert('orders', {
+        const insertData = {
           user_id: payload.userId || null,
-          items: JSON.stringify(payload.items || []),
+          items: payload.items || [], // <--- แก้ตรงนี้ ไม่ใช้ JSON.stringify ซ้อน
           total_amount: payload.total || 0,
           branch_id: payload.branch?.id || null,
           branch_name: payload.branch?.name || null,
           order_type: payload.type || 'pickup',
-          payment_method: 'transfer',
+          payment_method: payload.payment_method || 'cash',
           promo_code: payload.promoCode || null,
-          discount: payload.disc || 0,
+          discount: payload.discount || payload.disc || 0,
           status: payload.status || 'PENDING',
-          delivery_address: payload.delivery_address || null,
-          delivery_phone: payload.delivery_phone || null,
-          pickup_time: payload.pickup_time || null,
-          slip_url: payload.slipUrl || null,
-          source: 'CLIENT'
+          source: payload.source || 'POS',
+          staff_name: payload.staff_name || null,
+          queue_number: payload.queue_number || null
+        };
+
+        // ยิงคำสั่งไปที่ Supabase โดยตรง เพื่อขอข้อมูล (id และ created_at) กลับมาทันที
+        const res = await request(`${SUPABASE_URL}/rest/v1/orders`, {
+          method: 'POST',
+          headers: headers({ 'Prefer': 'return=representation' }),
+          body: JSON.stringify(insertData)
         });
 
-        const order = rows?.[0];
+        if (!res.ok) {
+           const errText = await res.text();
+           console.error("Supabase 400 Error:", errText);
+           throw new Error(errText);
+        }
+
+        const rows = await res.json();
+        const order = rows[0];
 
         return success({
           id: order?.id,
-          queue_number: order?.queue_number
+          queue_number: order?.queue_number,
+          created_at: order?.created_at
         });
       } catch (e) {
         return fail(e.message);
