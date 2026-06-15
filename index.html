@@ -1761,11 +1761,32 @@ function addToCart(){
   var m=S.cur;if(!m)return;
   var ts=S.cust.tops.reduce(function(s,t){return s+t.price},0);
   var u=parseInt(m.price)+S.cust.szX+ts;
-  var opts=[S.cust.sz,S.cust.sw,S.cust.ic].concat(S.cust.tops.map(function(t){return'+'+t.name})).join(' · ');
+  var totalItemPrice = u * S.cust.qty;
   var ni=ge('itemNote');
-  S.cart.push({uid:Date.now(),id:m.id,name:m.name,price:u,qty:S.cust.qty,opts:opts,note:ni?ni.value:'',tops:S.cust.tops.slice()});
+  
+  // เปลี่ยนมาเก็บแบบโครงสร้างที่คุณต้องการ
+  S.cart.push({
+    uid: Date.now(),
+    id: m.id,
+    name: m.name,
+    price: u,
+    qty: S.cust.qty,
+    total_item_price: totalItemPrice,
+    // เก็บ options แยกเป็นชิ้นๆ อย่างชัดเจน
+    options: {
+      size: S.cust.sz,
+      sweetness: S.cust.sw,
+      ice: S.cust.ic
+    },
+    addons: S.cust.tops.slice(),
+    note: ni ? ni.value : '',
+    // เก็บ opts แบบ String ไว้โชว์
+    opts: `Size ${S.cust.sz} · ${S.cust.sw} · ${S.cust.ic}` + (S.cust.tops.length ? ' · ' + S.cust.tops.map(function(t){return'+'+t.name}).join(', ') : '')
+  });
+  
   closeCS();updCartBar();toast(m.name+' added to cart');
-}
+  trackEvent('add_to_cart',{id:m.id,name:m.name,size:S.cust.sz,qty:S.cust.qty,price:u,tops:S.cust.tops.map(function(t){return t.name})});
+};
 
 /* ── CART (พร้อมระบบ Persistence จำตะกร้า) ───────────────────────────── */
 function saveCart() {
