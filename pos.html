@@ -2290,8 +2290,29 @@ function confirmItem() {
   TEMP_ITEM.note = ge('itemNote').value;
   const addonSum = TEMP_ITEM.addons.reduce((s,a) => s + a.price, 0);
   const unitPrice = TEMP_ITEM.basePrice + TEMP_ITEM.sizePrice + addonSum;
-  const optsArr = [`Size ${TEMP_ITEM.size}`, TEMP_ITEM.sweet, TEMP_ITEM.ice, ...TEMP_ITEM.addons.map(a => '+'+a.name)];
-  TICKET.push({ uid:Date.now(), id:TEMP_ITEM.id, name:TEMP_ITEM.name, price:unitPrice, qty:TEMP_ITEM.qty, opts:optsArr.join(' · '), options:{ sweetness:TEMP_ITEM.sweet, ice:TEMP_ITEM.ice }, addons:[...TEMP_ITEM.addons], note:TEMP_ITEM.note });
+  const totalItemPrice = unitPrice * TEMP_ITEM.qty;
+  
+  // เปลี่ยนมาเก็บแบบโครงสร้างที่คุณต้องการ
+  TICKET.push({ 
+    uid: Date.now(), 
+    id: TEMP_ITEM.id, 
+    name: TEMP_ITEM.name, 
+    price: unitPrice, 
+    qty: TEMP_ITEM.qty, 
+    total_item_price: totalItemPrice,
+    // เก็บ options แยกเป็นชิ้นๆ อย่างชัดเจน
+    options: {
+      size: TEMP_ITEM.size,
+      sweetness: TEMP_ITEM.sweet,
+      ice: TEMP_ITEM.ice
+    },
+    // เก็บ addons แยก
+    addons: [...TEMP_ITEM.addons], 
+    note: TEMP_ITEM.note,
+    // เก็บ opts แบบ String ไว้ด้วย เผื่อเอาไว้โชว์ในใบเสร็จหรือตะกร้าง่ายๆ (จะไม่ใช้ก็ตัดทิ้งได้)
+    opts: `Size ${TEMP_ITEM.size} · ${TEMP_ITEM.sweet} · ${TEMP_ITEM.ice}` + (TEMP_ITEM.addons.length ? ' · ' + TEMP_ITEM.addons.map(a => '+'+a.name).join(', ') : '')
+  });
+
   closeOverlay('itemOv');
   updateTicket();
   toast(TEMP_ITEM.name + ' added', 'success', 1500);
